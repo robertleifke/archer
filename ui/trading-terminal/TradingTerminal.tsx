@@ -23,6 +23,7 @@ import {
 } from "@/lib/mock-trading-data";
 import { BottomTabs } from "@/ui/trading-terminal/BottomTabs";
 import { ChartPanel } from "@/ui/trading-terminal/ChartPanel";
+import { LiveTabTitle } from "@/ui/trading-terminal/LiveTabTitle";
 import { MarketHeader } from "@/ui/trading-terminal/MarketHeader";
 import { OrderBook } from "@/ui/trading-terminal/OrderBook";
 import { TradePanel } from "@/ui/trading-terminal/TradePanel";
@@ -248,7 +249,6 @@ export function TradingTerminal({
   const [selectedSymbol, setSelectedSymbol] =
     useState<keyof typeof INSTRUMENT_MARKETS>(DEFAULT_SYMBOL);
   const [selectedContract, setSelectedContract] = useState<SelectedContract>(DEFAULT_CONTRACT);
-  const [favorite, setFavorite] = useState(true);
   const [timeframe, setTimeframe] = useState<(typeof TIMEFRAME_OPTIONS)[number]>(DEFAULT_TIMEFRAME);
   const [chartContext, setChartContext] = useState<(typeof CHART_CONTEXT_TABS)[number]>(
     DEFAULT_CHART_CONTEXT,
@@ -396,18 +396,18 @@ export function TradingTerminal({
 
   return (
     <main className="min-h-screen bg-[#0B1118] text-[#D1D5DB] xl:h-screen xl:overflow-hidden">
+      <LiveTabTitle pair={selectedSymbol} price={liveCandles.at(-1)?.close ?? null} />
+
       <div className="mx-auto flex min-h-screen w-full max-w-none flex-col p-2 xl:h-screen xl:overflow-hidden">
         <MarketHeader
           contractTabs={CONTRACT_TABS}
           currentContract={selectedContract}
           currentMarketId={selectedMarketId}
           currentSymbol={selectedSymbol}
-          favorite={favorite}
           infoBar={liveInfoBar}
           marketOptions={dynamicMarketOptions}
           onContractSelect={handleContractSelect}
           onMarketSelect={handleMarketSelect}
-          onFavoriteToggle={() => setFavorite((current) => !current)}
         />
 
         <section className="mt-2 grid flex-1 grid-cols-1 gap-2 xl:min-h-0 xl:grid-cols-[minmax(0,65fr)_minmax(280px,20fr)_minmax(250px,15fr)] xl:overflow-hidden">

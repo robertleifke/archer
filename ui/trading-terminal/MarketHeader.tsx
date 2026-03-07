@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Dot, Search, Star, X } from "lucide-react";
+import { ChevronDown, Dot, Search, X } from "lucide-react";
 import type { ContractTab, MarketOption, MarketStat } from "@/lib/trading.types";
 import { cn } from "@/lib/cn";
 import { SmartImage } from "@/ui/SmartImage";
@@ -11,23 +11,19 @@ export function MarketHeader({
   currentContract,
   currentMarketId,
   currentSymbol,
-  favorite,
   infoBar,
   marketOptions,
   onContractSelect,
   onMarketSelect,
-  onFavoriteToggle,
 }: {
   contractTabs: ContractTab[];
   currentContract: string;
   currentMarketId: string;
   currentSymbol: string;
-  favorite: boolean;
   infoBar: MarketStat[];
   marketOptions: MarketOption[];
   onContractSelect: (contract: string) => void;
   onMarketSelect: (marketId: string) => void;
-  onFavoriteToggle: () => void;
 }) {
   const primaryTabs = ["All", "Spot", "Futures"] as const;
   const [marketSearchOpen, setMarketSearchOpen] = useState(false);
@@ -73,17 +69,6 @@ export function MarketHeader({
               priority
               src="/numo_logo_white.png"
             />
-
-            <button
-              className={cn(
-                "flex size-7 items-center justify-center rounded-sm border border-[#1B2430] bg-[#11161D] text-[#6B7280] transition-colors hover:text-[#D1D5DB]",
-                favorite && "text-[#D1D5DB]",
-              )}
-              onClick={onFavoriteToggle}
-              type="button"
-            >
-              <Star className={cn("size-3.5", favorite && "fill-current")} />
-            </button>
 
             <div className="relative">
               <button
