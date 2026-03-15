@@ -46,7 +46,7 @@ export type MarketOption = {
   id: string;
   lastPrice: string;
   marketType: "Futures" | "Spot";
-  region: "Africa" | "Europe";
+  region: "Crypto";
   symbol: string;
 };
 

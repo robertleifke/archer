@@ -63,11 +63,11 @@ export function MarketHeader({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <SmartImage<string>
-              alt="Numo"
+              alt="Archer"
               className="ml-3 h-6 w-24 shrink-0 sm:h-7 sm:w-28"
               imgClassName="object-left"
               priority
-              src="/numo_logo_white.png"
+              src="/archer_transparent.png"
             />
 
             <div className="relative">

@@ -1,7 +1,6 @@
 "use client";
 
 import { startTransition, useEffect, useState } from "react";
-import type { ChainlinkSpotSnapshot } from "@/lib/chainlink-ngn-usd";
 import type { SpotHistorySnapshot } from "@/lib/exchange-api-history";
 import type { CHART_CONTEXT_TABS, CHART_RANGE_BUTTONS, TIMEFRAME_OPTIONS } from "@/lib/mock-trading-data";
 import type { CONTRACT_LABELS } from "@/lib/mock-trading-data";
@@ -56,10 +55,12 @@ function shiftCandles(
 }
 
 function buildActivityViews(ticker: string, positionValue: string, entryPrice: string, markPrice: string, pnl: string) {
+  const baseAsset = getBaseAsset(ticker);
+
   return {
     "open-orders": {
       ...ACTIVITY_VIEWS["open-orders"],
-      rows: [{ cells: [ticker, "Buy USD", "Limit", "25,000", entryPrice] }],
+      rows: [{ cells: [ticker, `Buy ${baseAsset}`, "Limit", "1.50", entryPrice] }],
     },
     positions: {
       ...ACTIVITY_VIEWS.positions,
@@ -68,15 +69,15 @@ function buildActivityViews(ticker: string, positionValue: string, entryPrice: s
     "trade-history": {
       ...ACTIVITY_VIEWS["trade-history"],
       rows: [
-        { cells: ["10:08:14", ticker, "Buy USD", "50,000", markPrice] },
-        { cells: ["10:08:06", ticker, "Sell USD", "35,000", entryPrice] },
+        { cells: ["10:08:14", ticker, `Buy ${baseAsset}`, "2.00", markPrice] },
+        { cells: ["10:08:06", ticker, `Sell ${baseAsset}`, "1.25", entryPrice] },
       ],
     },
   };
 }
 
-function getIndexDigits(symbol: string) {
-  return symbol === "NGN/USD" ? 2 : 5;
+function getIndexDigits(_symbol: string) {
+  return 2;
 }
 
 function getDisplayTicker(symbol: string, marketType: "Futures" | "Spot", ticker: string) {
@@ -84,7 +85,27 @@ function getDisplayTicker(symbol: string, marketType: "Futures" | "Spot", ticker
 }
 
 function getPricePrecision(symbol: string) {
-  return symbol === "NGN/USD" ? 2 : 5;
+  return symbol === "BTC/USD" ? 0 : 2;
+}
+
+function getBaseAsset(symbol: string) {
+  if (symbol.includes("-")) {
+    return symbol.split("USD")[0] ?? symbol;
+  }
+
+  return symbol.split("/")[0] ?? symbol;
+}
+
+function getDisplaySymbol(symbol: keyof typeof INSTRUMENT_MARKETS, marketType: "Futures" | "Spot") {
+  if (marketType === "Spot") {
+    return symbol;
+  }
+
+  return symbol === "BTC/USD" ? "BTCUSD-SQPERP" : "ETHUSD-SQPERP";
+}
+
+function getInstrumentKeyFromMarketId(marketId: string): keyof typeof INSTRUMENT_MARKETS {
+  return marketId.startsWith("btc-") ? "BTC/USD" : "ETH/USD";
 }
 
 function getChartUpdateInterval(timeframe: (typeof TIMEFRAME_OPTIONS)[number]) {
@@ -159,8 +180,8 @@ function simulateLiveCandles(
     timeframeScale = 1.8;
   }
 
-  const drift = (symbol === "NGN/USD" ? 0.28 : 0.000_28) * timeframeScale;
-  const volatility = (symbol === "NGN/USD" ? 0.42 : 0.000_36) * timeframeScale;
+  const drift = (symbol === "BTC/USD" ? 42 : 3.8) * timeframeScale;
+  const volatility = (symbol === "BTC/USD" ? 88 : 11.5) * timeframeScale;
   const directionalBias = Math.random() > 0.5 ? drift : -drift;
   const delta = directionalBias + (Math.random() - 0.5) * volatility;
   const nextClose = Number((lastCandle.close + delta).toFixed(precision));
@@ -239,13 +260,11 @@ function buildLiveInfoBar(
 type SelectedContract = (typeof CONTRACT_LABELS)[number];
 
 export function TradingTerminal({
-  chainlinkSpot,
   spotHistory,
 }: {
-  chainlinkSpot: ChainlinkSpotSnapshot | null;
   spotHistory: Record<SpotHistorySnapshot["pair"], SpotHistorySnapshot> | null;
 }) {
-  const [selectedMarketId, setSelectedMarketId] = useState("ngn-usd-futures");
+  const [selectedMarketId, setSelectedMarketId] = useState("btc-usd-futures");
   const [selectedSymbol, setSelectedSymbol] =
     useState<keyof typeof INSTRUMENT_MARKETS>(DEFAULT_SYMBOL);
   const [selectedContract, setSelectedContract] = useState<SelectedContract>(DEFAULT_CONTRACT);
@@ -261,7 +280,7 @@ export function TradingTerminal({
   const [orderBookView, setOrderBookView] = useState<"Order Book" | "Trades">("Order Book");
   const [orderType, setOrderType] = useState<"Limit" | "Market" | "Stop">(DEFAULT_ORDER_TYPE);
   const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
-  const [size, setSize] = useState("50000");
+  const [size, setSize] = useState("1");
   const [allocation, setAllocation] = useState(20);
   const [postOnly, setPostOnly] = useState(false);
   const [atExpiryDeliver, setAtExpiryDeliver] = useState(true);
@@ -280,14 +299,13 @@ export function TradingTerminal({
       : null;
   const liveIndex =
     selectedSpotHistory?.latestPrice ??
-    (selectedSymbol === "NGN/USD"
-      ? (chainlinkSpot?.priceNgnPerUsd ?? parseNumericString(market.index))
-      : parseNumericString(market.index));
+    parseNumericString(market.index);
   const liveMark = parseNumericString(market.mark);
   const liveBasis = liveMark - liveIndex;
   const dynamicMarketOptions = MARKET_OPTIONS.map((marketOption) => {
+    const instrumentKey = getInstrumentKeyFromMarketId(marketOption.id);
     const latestSpotPrice =
-      spotHistory?.[marketOption.symbol as SpotHistorySnapshot["pair"]]?.latestPrice;
+      spotHistory?.[instrumentKey as SpotHistorySnapshot["pair"]]?.latestPrice;
 
     if (marketOption.marketType !== "Spot" || !latestSpotPrice) {
       return marketOption;
@@ -295,10 +313,7 @@ export function TradingTerminal({
 
     return {
       ...marketOption,
-      lastPrice:
-        marketOption.symbol === "NGN/USD"
-          ? formatPrice(latestSpotPrice, 2)
-          : latestSpotPrice.toFixed(5),
+      lastPrice: formatPrice(latestSpotPrice, getPricePrecision(marketOption.symbol)),
     } satisfies MarketOption;
   });
   const dynamicActivityViews = buildActivityViews(
@@ -374,7 +389,7 @@ export function TradingTerminal({
 
     startTransition(() => {
       setSelectedMarketId(marketId);
-      setSelectedSymbol(nextMarket.symbol as keyof typeof INSTRUMENT_MARKETS);
+      setSelectedSymbol(getInstrumentKeyFromMarketId(nextMarket.id));
       setSelectedContract(DEFAULT_CONTRACT);
       setChartContext(nextMarket.marketType === "Spot" ? "Spot" : DEFAULT_CHART_CONTEXT);
       setLastAction(`Switched to ${nextMarket.symbol} ${nextMarket.marketType}`);
@@ -388,9 +403,11 @@ export function TradingTerminal({
   }
 
   function handleSubmit(side: "buy" | "sell") {
+    const baseAsset = getBaseAsset(selectedSymbol);
+
     setTradeSide(side);
     setLastAction(
-      `${side === "buy" ? "Buy USD" : "Sell USD"} ${Number(size || "0").toLocaleString("en-US")} on ${market.ticker}`,
+      `${side === "buy" ? "Buy" : "Sell"} ${baseAsset} ${Number(size || "0").toLocaleString("en-US")} on ${market.ticker}`,
     );
   }
 
@@ -403,7 +420,7 @@ export function TradingTerminal({
           contractTabs={CONTRACT_TABS}
           currentContract={selectedContract}
           currentMarketId={selectedMarketId}
-          currentSymbol={selectedSymbol}
+          currentSymbol={getDisplaySymbol(selectedSymbol, selectedMarket.marketType)}
           infoBar={liveInfoBar}
           marketOptions={dynamicMarketOptions}
           onContractSelect={handleContractSelect}
@@ -443,14 +460,18 @@ export function TradingTerminal({
 
           <div className="min-h-[420px] xl:min-h-0 xl:overflow-hidden">
             <TradePanel
+              baseAsset={getBaseAsset(selectedSymbol)}
               allocation={allocation}
               atExpiryDeliver={atExpiryDeliver}
               contractDetails={market.contractDetails}
               contractLabel={getDisplayTicker(selectedSymbol, selectedMarket.marketType, market.ticker)}
+              markPrice={formatPrice(liveMark, getPricePrecision(selectedSymbol))}
               lastAction={lastAction}
               orderType={orderType}
               positionOverview={market.positionOverview}
               postOnly={postOnly}
+              quoteAsset="USD"
+              settlementWallet="USDC / USD Margin"
               size={size}
               tradeSide={tradeSide}
               onAllocationChange={setAllocation}

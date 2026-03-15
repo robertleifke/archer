@@ -24,144 +24,144 @@ import type {
   TradePrint,
 } from "@/lib/trading.types";
 
-const BASE_NGN_CANDLES = [
-  [1594.8, 1596.4, 1594.1, 1595.9, 220],
-  [1595.9, 1597.3, 1595.0, 1596.8, 245],
-  [1596.8, 1598.6, 1596.4, 1597.9, 260],
-  [1597.9, 1599.2, 1597.1, 1598.4, 272],
-  [1598.4, 1599.8, 1597.8, 1598.0, 255],
-  [1598.0, 1599.5, 1597.4, 1598.9, 249],
-  [1598.9, 1600.6, 1598.2, 1600.1, 281],
-  [1600.1, 1601.5, 1599.6, 1600.8, 296],
-  [1600.8, 1602.1, 1600.2, 1601.4, 308],
-  [1601.4, 1603.2, 1600.9, 1602.6, 325],
-  [1602.6, 1604.1, 1601.8, 1603.7, 356],
-  [1603.7, 1605.2, 1603.1, 1604.8, 372],
-  [1604.8, 1606.3, 1604.0, 1605.5, 390],
-  [1605.5, 1607.0, 1604.9, 1606.4, 406],
-  [1606.4, 1608.2, 1605.8, 1607.6, 422],
-  [1607.6, 1608.8, 1606.9, 1607.1, 401],
-  [1607.1, 1608.4, 1606.1, 1606.6, 384],
-  [1606.6, 1607.2, 1605.4, 1605.9, 362],
-  [1605.9, 1606.6, 1604.8, 1605.1, 348],
-  [1605.1, 1606.0, 1604.5, 1605.4, 333],
-  [1605.4, 1606.3, 1604.9, 1605.8, 321],
-  [1605.8, 1606.2, 1604.6, 1605.0, 316],
-  [1605.0, 1605.8, 1604.2, 1604.7, 305],
-  [1604.7, 1605.6, 1603.9, 1604.4, 299],
-  [1604.4, 1605.3, 1603.8, 1604.9, 292],
-  [1604.9, 1605.9, 1604.4, 1605.3, 310],
-  [1605.3, 1606.0, 1604.7, 1605.1, 304],
-  [1605.1, 1606.1, 1604.5, 1605.2, 318],
+const BASE_BTC_CANDLES = [
+  [82_640, 82_880, 82_440, 82_760, 220],
+  [82_760, 83_040, 82_620, 82_980, 245],
+  [82_980, 83_220, 82_810, 83_140, 260],
+  [83_140, 83_420, 82_980, 83_260, 272],
+  [83_260, 83_510, 83_040, 83_120, 255],
+  [83_120, 83_400, 82_930, 83_300, 249],
+  [83_300, 83_690, 83_150, 83_560, 281],
+  [83_560, 83_920, 83_340, 83_740, 296],
+  [83_740, 84_080, 83_520, 83_960, 308],
+  [83_960, 84_310, 83_700, 84_180, 325],
+  [84_180, 84_520, 83_940, 84_360, 356],
+  [84_360, 84_740, 84_120, 84_540, 372],
+  [84_540, 84_960, 84_260, 84_720, 390],
+  [84_720, 85_030, 84_480, 84_860, 406],
+  [84_860, 85_240, 84_620, 85_060, 422],
+  [85_060, 85_280, 84_740, 84_940, 401],
+  [84_940, 85_160, 84_520, 84_760, 384],
+  [84_760, 84_980, 84_310, 84_520, 362],
+  [84_520, 84_760, 84_050, 84_280, 348],
+  [84_280, 84_510, 83_980, 84_160, 333],
+  [84_160, 84_420, 83_940, 84_240, 321],
+  [84_240, 84_460, 84_020, 84_110, 316],
+  [84_110, 84_350, 83_860, 83_980, 305],
+  [83_980, 84_240, 83_720, 83_910, 299],
+  [83_910, 84_180, 83_680, 84_040, 292],
+  [84_040, 84_360, 83_860, 84_220, 310],
+  [84_220, 84_470, 84_010, 84_180, 304],
+  [84_180, 84_520, 83_960, 84_260, 318],
 ] as const;
 
-const BASE_EUR_CANDLES = [
-  [1.0812, 1.0818, 1.0809, 1.0815, 180],
-  [1.0815, 1.0824, 1.0811, 1.0820, 192],
-  [1.0820, 1.0829, 1.0816, 1.0825, 201],
-  [1.0825, 1.0833, 1.0821, 1.0828, 205],
-  [1.0828, 1.0831, 1.0820, 1.0823, 188],
-  [1.0823, 1.0830, 1.0819, 1.0826, 183],
-  [1.0826, 1.0834, 1.0822, 1.0831, 208],
-  [1.0831, 1.0839, 1.0826, 1.0835, 219],
-  [1.0835, 1.0842, 1.0830, 1.0839, 224],
-  [1.0839, 1.0848, 1.0834, 1.0844, 237],
-  [1.0844, 1.0851, 1.0840, 1.0848, 249],
-  [1.0848, 1.0856, 1.0844, 1.0851, 258],
-  [1.0851, 1.0859, 1.0847, 1.0855, 267],
-  [1.0855, 1.0862, 1.0851, 1.0858, 274],
-  [1.0858, 1.0866, 1.0853, 1.0861, 283],
-  [1.0861, 1.0865, 1.0854, 1.0857, 278],
-  [1.0857, 1.0860, 1.0850, 1.0854, 270],
-  [1.0854, 1.0857, 1.0848, 1.0850, 261],
-  [1.0850, 1.0855, 1.0845, 1.0848, 255],
-  [1.0848, 1.0853, 1.0844, 1.0850, 248],
-  [1.0850, 1.0854, 1.0846, 1.0852, 242],
-  [1.0852, 1.0857, 1.0848, 1.0850, 239],
-  [1.0850, 1.0853, 1.0845, 1.0847, 233],
-  [1.0847, 1.0851, 1.0842, 1.0845, 228],
-  [1.0845, 1.0850, 1.0840, 1.0848, 225],
-  [1.0848, 1.0854, 1.0844, 1.0851, 231],
-  [1.0851, 1.0857, 1.0847, 1.0850, 229],
-  [1.0850, 1.0856, 1.0846, 1.0852, 235],
+const BASE_ETH_CANDLES = [
+  [4080, 4094, 4070, 4088, 180],
+  [4088, 4106, 4080, 4101, 192],
+  [4101, 4122, 4090, 4114, 201],
+  [4114, 4135, 4102, 4126, 205],
+  [4126, 4132, 4100, 4109, 188],
+  [4109, 4126, 4098, 4118, 183],
+  [4118, 4142, 4108, 4135, 208],
+  [4135, 4158, 4124, 4149, 219],
+  [4149, 4172, 4138, 4162, 224],
+  [4162, 4188, 4152, 4176, 237],
+  [4176, 4201, 4168, 4192, 249],
+  [4192, 4218, 4180, 4205, 258],
+  [4205, 4229, 4196, 4216, 267],
+  [4216, 4242, 4204, 4228, 274],
+  [4228, 4256, 4214, 4241, 283],
+  [4241, 4250, 4220, 4232, 278],
+  [4232, 4240, 4208, 4219, 270],
+  [4219, 4228, 4194, 4207, 261],
+  [4207, 4220, 4188, 4198, 255],
+  [4198, 4214, 4186, 4205, 248],
+  [4205, 4218, 4192, 4211, 242],
+  [4211, 4227, 4199, 4203, 239],
+  [4203, 4214, 4186, 4194, 233],
+  [4194, 4208, 4176, 4187, 228],
+  [4187, 4206, 4170, 4198, 225],
+  [4198, 4220, 4188, 4210, 231],
+  [4210, 4228, 4198, 4205, 229],
+  [4205, 4224, 4192, 4214, 235],
 ] as const;
 
-const BASE_NGN_ASKS = [
-  { price: 1605.6, size: 50_000, total: 1_305_000 },
-  { price: 1605.7, size: 75_000, total: 1_255_000 },
-  { price: 1605.8, size: 100_000, total: 1_180_000 },
-  { price: 1605.9, size: 125_000, total: 1_080_000 },
-  { price: 1606.0, size: 150_000, total: 955_000 },
-  { price: 1606.1, size: 180_000, total: 805_000 },
-  { price: 1606.2, size: 220_000, total: 625_000 },
+const BASE_BTC_ASKS = [
+  { price: 84_280, size: 3, total: 81 },
+  { price: 84_290, size: 4, total: 78 },
+  { price: 84_300, size: 5, total: 74 },
+  { price: 84_310, size: 6, total: 69 },
+  { price: 84_320, size: 7, total: 63 },
+  { price: 84_330, size: 8, total: 56 },
+  { price: 84_340, size: 9, total: 48 },
 ] as const;
 
-const BASE_NGN_BIDS = [
-  { price: 1605.1, size: 240_000, total: 240_000 },
-  { price: 1605.0, size: 210_000, total: 450_000 },
-  { price: 1604.9, size: 180_000, total: 630_000 },
-  { price: 1604.8, size: 150_000, total: 780_000 },
-  { price: 1604.7, size: 120_000, total: 900_000 },
-  { price: 1604.6, size: 90_000, total: 990_000 },
-  { price: 1604.5, size: 70_000, total: 1_060_000 },
+const BASE_BTC_BIDS = [
+  { price: 84_250, size: 10, total: 10 },
+  { price: 84_240, size: 9, total: 19 },
+  { price: 84_230, size: 8, total: 27 },
+  { price: 84_220, size: 7, total: 34 },
+  { price: 84_210, size: 6, total: 40 },
+  { price: 84_200, size: 5, total: 45 },
+  { price: 84_190, size: 4, total: 49 },
 ] as const;
 
-const BASE_EUR_ASKS = [
-  { price: 1.0853, size: 250_000, total: 2_950_000 },
-  { price: 1.0854, size: 500_000, total: 2_700_000 },
-  { price: 1.0855, size: 750_000, total: 2_200_000 },
-  { price: 1.0856, size: 900_000, total: 1_450_000 },
-  { price: 1.0857, size: 1_100_000, total: 550_000 },
-  { price: 1.0858, size: 1_400_000, total: 450_000 },
-  { price: 1.0859, size: 1_800_000, total: 300_000 },
+const BASE_ETH_ASKS = [
+  { price: 4215, size: 18, total: 162 },
+  { price: 4216, size: 22, total: 144 },
+  { price: 4217, size: 26, total: 122 },
+  { price: 4218, size: 30, total: 96 },
+  { price: 4219, size: 34, total: 66 },
+  { price: 4220, size: 40, total: 32 },
+  { price: 4221, size: 44, total: 20 },
 ] as const;
 
-const BASE_EUR_BIDS = [
-  { price: 1.0852, size: 1_900_000, total: 1_900_000 },
-  { price: 1.0851, size: 1_500_000, total: 3_400_000 },
-  { price: 1.0850, size: 1_200_000, total: 4_600_000 },
-  { price: 1.0849, size: 950_000, total: 5_550_000 },
-  { price: 1.0848, size: 700_000, total: 6_250_000 },
-  { price: 1.0847, size: 550_000, total: 6_800_000 },
-  { price: 1.0846, size: 400_000, total: 7_200_000 },
+const BASE_ETH_BIDS = [
+  { price: 4214, size: 46, total: 46 },
+  { price: 4213, size: 40, total: 86 },
+  { price: 4212, size: 34, total: 120 },
+  { price: 4211, size: 28, total: 148 },
+  { price: 4210, size: 22, total: 170 },
+  { price: 4209, size: 18, total: 188 },
+  { price: 4208, size: 14, total: 202 },
 ] as const;
 
-const NGN_CONTRACT_META = {
+const BTC_CONTRACT_META = {
   "DEC 2026": {
-    basis: "+4.10",
+    basis: "+220.00",
     id: "DEC 2026",
-    index: "1,603.90",
-    mark: "1,608.00",
-    openInterest: "$34.1M",
+    index: "84,380.00",
+    mark: "84,600.00",
+    openInterest: "$134.1M",
     timeToExpiry: "284d",
-    volume: "$2.9M",
+    volume: "$28.9M",
   },
   "JUN 2026": {
-    basis: "+1.35",
+    basis: "+70.00",
     id: "JUN 2026",
-    index: "1,603.90",
-    mark: "1,605.25",
-    openInterest: "$48.3M",
+    index: "84,180.00",
+    mark: "84,250.00",
+    openInterest: "$148.3M",
     timeToExpiry: "101d",
-    volume: "$6.2M",
+    volume: "$36.2M",
   },
   "MAR 2026": {
-    basis: "+0.55",
+    basis: "+25.00",
     id: "MAR 2026",
-    index: "1,603.90",
-    mark: "1,604.45",
-    openInterest: "$22.4M",
+    index: "84,180.00",
+    mark: "84,205.00",
+    openInterest: "$112.4M",
     timeToExpiry: "11d",
-    volume: "$3.8M",
+    volume: "$19.8M",
   },
   "SEP 2026": {
-    basis: "+2.65",
+    basis: "+130.00",
     id: "SEP 2026",
-    index: "1,603.90",
-    mark: "1,606.55",
-    openInterest: "$39.7M",
+    index: "84,180.00",
+    mark: "84,310.00",
+    openInterest: "$129.7M",
     timeToExpiry: "193d",
-    volume: "$4.7M",
+    volume: "$24.7M",
   },
 } as const satisfies Record<
   string,
@@ -176,39 +176,39 @@ const NGN_CONTRACT_META = {
   }
 >;
 
-const EUR_CONTRACT_META = {
+const ETH_CONTRACT_META = {
   "DEC 2026": {
-    basis: "+0.0032",
+    basis: "+18.00",
     id: "DEC 2026",
-    index: "1.0849",
-    mark: "1.0881",
+    index: "4,208.00",
+    mark: "4,226.00",
     openInterest: "$91.4M",
     timeToExpiry: "284d",
     volume: "$18.6M",
   },
   "JUN 2026": {
-    basis: "+0.0011",
+    basis: "+6.00",
     id: "JUN 2026",
-    index: "1.0841",
-    mark: "1.0852",
+    index: "4,208.00",
+    mark: "4,214.00",
     openInterest: "$128.7M",
     timeToExpiry: "101d",
     volume: "$24.9M",
   },
   "MAR 2026": {
-    basis: "+0.0004",
+    basis: "+3.00",
     id: "MAR 2026",
-    index: "1.0839",
-    mark: "1.0843",
+    index: "4,208.00",
+    mark: "4,211.00",
     openInterest: "$74.5M",
     timeToExpiry: "11d",
     volume: "$15.2M",
   },
   "SEP 2026": {
-    basis: "+0.0019",
+    basis: "+11.00",
     id: "SEP 2026",
-    index: "1.0844",
-    mark: "1.0863",
+    index: "4,208.00",
+    mark: "4,219.00",
     openInterest: "$109.2M",
     timeToExpiry: "193d",
     volume: "$21.1M",
@@ -233,42 +233,47 @@ export const CONTRACT_TABS = CONTRACT_LABELS.map((label) => ({
   label,
 })) satisfies ContractTab[];
 
+const FUTURES_DISPLAY_SYMBOL = {
+  "BTC/USD": "BTCUSD-SQPERP",
+  "ETH/USD": "ETHUSD-SQPERP",
+} as const satisfies Record<"BTC/USD" | "ETH/USD", string>;
+
 export const MARKET_OPTIONS = [
   {
     frontMonth: "MAR26",
-    id: "ngn-usd-futures",
-    lastPrice: "1,576.80",
+    id: "btc-usd-futures",
+    lastPrice: "84,205.00",
     marketType: "Futures",
-    region: "Africa",
-    symbol: "NGN/USD",
+    region: "Crypto",
+    symbol: "BTCUSD-SQPERP",
   },
   {
     frontMonth: "SPOT",
-    id: "ngn-usd-spot",
-    lastPrice: "1,603.90",
+    id: "btc-usd-spot",
+    lastPrice: "84,180.00",
     marketType: "Spot",
-    region: "Africa",
-    symbol: "NGN/USD",
+    region: "Crypto",
+    symbol: "BTC/USD",
   },
   {
     frontMonth: "JUN26",
-    id: "eur-usd-futures",
-    lastPrice: "1.08520",
+    id: "eth-usd-futures",
+    lastPrice: "4,214.00",
     marketType: "Futures",
-    region: "Europe",
-    symbol: "EUR/USD",
+    region: "Crypto",
+    symbol: "ETHUSD-SQPERP",
   },
   {
     frontMonth: "SPOT",
-    id: "eur-usd-spot",
-    lastPrice: "1.08410",
+    id: "eth-usd-spot",
+    lastPrice: "4,208.00",
     marketType: "Spot",
-    region: "Europe",
-    symbol: "EUR/USD",
+    region: "Crypto",
+    symbol: "ETH/USD",
   },
 ] satisfies MarketOption[];
 
-function getExpiryLabel(label: keyof typeof NGN_CONTRACT_META) {
+function getExpiryLabel(label: keyof typeof BTC_CONTRACT_META) {
   if (label === "MAR 2026") {
     return "March 18";
   }
@@ -284,28 +289,28 @@ function getExpiryLabel(label: keyof typeof NGN_CONTRACT_META) {
   return "December 16";
 }
 
-function getPositionSize(label: keyof typeof NGN_CONTRACT_META) {
+function getPositionSize(label: keyof typeof BTC_CONTRACT_META) {
   if (label === "MAR 2026") {
-    return "+20,000 USD";
+    return "+2.00 BTC";
   }
 
   if (label === "DEC 2026") {
-    return "+10,000 USD";
+    return "+1.00 BTC";
   }
 
-  return "+50,000 USD";
+  return "+5.00 BTC";
 }
 
-function getUnrealizedPnl(label: keyof typeof NGN_CONTRACT_META) {
+function getUnrealizedPnl(label: keyof typeof BTC_CONTRACT_META) {
   if (label === "DEC 2026") {
-    return "+$84";
+    return "+$1,840";
   }
 
   if (label === "MAR 2026") {
-    return "+$61";
+    return "+$620";
   }
 
-  return "+$156";
+  return "+$3,150";
 }
 
 function parseNumber(value: string) {
@@ -340,57 +345,58 @@ function buildBook(
   }));
 }
 
-function buildNgnTrades(mark: string, basis: string) {
+function buildBtcTrades(mark: string, basis: string) {
   const markNumber = parseNumber(mark);
   const basisNumber = parseNumber(basis);
 
   return [
-    { price: markNumber + 0.05, side: "buy", size: 50_000, time: "10:08:14" },
-    { price: markNumber, side: "sell", size: 35_000, time: "10:08:06" },
-    { price: markNumber - 0.05, side: "sell", size: 75_000, time: "10:07:53" },
-    { price: markNumber + basisNumber / 10, side: "buy", size: 20_000, time: "10:07:41" },
-    { price: markNumber, side: "buy", size: 15_000, time: "10:07:17" },
+    { price: markNumber + 15, side: "buy", size: 3, time: "10:08:14" },
+    { price: markNumber, side: "sell", size: 2, time: "10:08:06" },
+    { price: markNumber - 15, side: "sell", size: 4, time: "10:07:53" },
+    { price: markNumber + basisNumber / 8, side: "buy", size: 2, time: "10:07:41" },
+    { price: markNumber, side: "buy", size: 1, time: "10:07:17" },
   ] satisfies TradePrint[];
 }
 
-function buildEurTrades(mark: string, basis: string) {
+function buildEthTrades(mark: string, basis: string) {
   const markNumber = parseNumber(mark);
   const basisNumber = parseNumber(basis);
 
   return [
-    { price: Number((markNumber + 0.0001).toFixed(4)), side: "buy", size: 2_000_000, time: "10:08:14" },
-    { price: Number(markNumber.toFixed(4)), side: "sell", size: 1_250_000, time: "10:08:06" },
-    { price: Number((markNumber - 0.0001).toFixed(4)), side: "sell", size: 1_800_000, time: "10:07:53" },
-    { price: Number((markNumber + basisNumber / 8).toFixed(4)), side: "buy", size: 950_000, time: "10:07:41" },
-    { price: Number(markNumber.toFixed(4)), side: "buy", size: 800_000, time: "10:07:17" },
+    { price: Number((markNumber + 1).toFixed(2)), side: "buy", size: 18, time: "10:08:14" },
+    { price: Number(markNumber.toFixed(2)), side: "sell", size: 12, time: "10:08:06" },
+    { price: Number((markNumber - 1).toFixed(2)), side: "sell", size: 16, time: "10:07:53" },
+    { price: Number((markNumber + basisNumber / 6).toFixed(2)), side: "buy", size: 10, time: "10:07:41" },
+    { price: Number(markNumber.toFixed(2)), side: "buy", size: 8, time: "10:07:17" },
   ] satisfies TradePrint[];
 }
 
-function buildNgnContractMarket(
-  symbol: string,
-  label: keyof typeof NGN_CONTRACT_META,
+function buildBtcContractMarket(
+  symbol: "BTC/USD",
+  label: keyof typeof BTC_CONTRACT_META,
   offset: number,
   sizeMultiplier: number,
 ) {
-  const meta = NGN_CONTRACT_META[label];
+  const meta = BTC_CONTRACT_META[label];
+  const contractSymbol = FUTURES_DISPLAY_SYMBOL[symbol];
 
   return {
     basis: meta.basis,
-    candles: buildCandles(BASE_NGN_CANDLES, offset, 1),
+    candles: buildCandles(BASE_BTC_CANDLES, offset, 0),
     contractDetails: [
-      { label: "Contract", value: `${symbol} ${label}` },
-      { label: "Contract Size", value: "10,000 USD" },
-      { label: "Tick Size", value: "0.1 NGN" },
-      { label: "Tick Value", value: "$0.62 / 1.0 NGN" },
+      { label: "Contract", value: `${contractSymbol} ${label}` },
+      { label: "Contract Size", value: "1 BTC" },
+      { label: "Tick Size", value: "$5.00" },
+      { label: "Tick Value", value: "$5.00 / tick" },
       { label: "Expiry", value: `${getExpiryLabel(label)}, 2026, 16:00 UTC` },
-      { label: "Settlement", value: "Physical stablecoin delivery" },
-      { label: "Long receives", value: "cNGN" },
-      { label: "Short receives", value: "USDC" },
+      { label: "Settlement", value: "Cash-settled in USD collateral" },
+      { label: "Long receives", value: "BTC exposure" },
+      { label: "Short receives", value: "USD collateral" },
     ],
     id: label,
     index: meta.index,
     infoBar: [
-      { label: "Contract", value: `${symbol} ${label}` },
+      { label: "Contract", value: `${contractSymbol} ${label}` },
       { label: "Mark", value: meta.mark },
       { label: "Index", value: meta.index },
       { label: "Basis", tone: "accent", value: meta.basis },
@@ -399,45 +405,46 @@ function buildNgnContractMarket(
       { label: "Time to Expiry", value: meta.timeToExpiry },
     ],
     mark: meta.mark,
-    orderBookAsks: buildBook(BASE_NGN_ASKS, offset, sizeMultiplier, 2),
-    orderBookBids: buildBook(BASE_NGN_BIDS, offset, sizeMultiplier, 2),
+    orderBookAsks: buildBook(BASE_BTC_ASKS, offset, sizeMultiplier, 2),
+    orderBookBids: buildBook(BASE_BTC_BIDS, offset, sizeMultiplier, 2),
     positionOverview: [
-      { label: "Position (USD)", value: getPositionSize(label) },
-      { label: "Entry Price", value: Number(parseNumber(meta.mark) - 5.2).toFixed(1) },
-      { label: "Mark Price", value: Number(parseNumber(meta.mark)).toFixed(1) },
+      { label: "Position (BTC)", value: getPositionSize(label) },
+      { label: "Entry Price", value: Number(parseNumber(meta.mark) - 630).toFixed(2) },
+      { label: "Mark Price", value: Number(parseNumber(meta.mark)).toFixed(2) },
       { label: "Unrealized PnL", value: getUnrealizedPnl(label) },
     ],
-    ticker: `${symbol} ${label}`,
+    ticker: `${contractSymbol} ${label}`,
     timeToExpiry: meta.timeToExpiry,
-    trades: buildNgnTrades(meta.mark, meta.basis),
+    trades: buildBtcTrades(meta.mark, meta.basis),
   } satisfies ContractMarket;
 }
 
-function buildEurContractMarket(
-  symbol: string,
-  label: keyof typeof EUR_CONTRACT_META,
+function buildEthContractMarket(
+  symbol: "ETH/USD",
+  label: keyof typeof ETH_CONTRACT_META,
   offset: number,
   sizeMultiplier: number,
 ) {
-  const meta = EUR_CONTRACT_META[label];
+  const meta = ETH_CONTRACT_META[label];
+  const contractSymbol = FUTURES_DISPLAY_SYMBOL[symbol];
 
   return {
     basis: meta.basis,
-    candles: buildCandles(BASE_EUR_CANDLES, offset, 4),
+    candles: buildCandles(BASE_ETH_CANDLES, offset, 2),
     contractDetails: [
-      { label: "Contract", value: `${symbol} ${label}` },
-      { label: "Contract Size", value: "125,000 EUR" },
-      { label: "Tick Size", value: "0.00005 USD" },
-      { label: "Tick Value", value: "$6.25 / tick" },
+      { label: "Contract", value: `${contractSymbol} ${label}` },
+      { label: "Contract Size", value: "10 ETH" },
+      { label: "Tick Size", value: "$0.50" },
+      { label: "Tick Value", value: "$5.00 / tick" },
       { label: "Expiry", value: `${getExpiryLabel(label)}, 2026, 16:00 UTC` },
-      { label: "Settlement", value: "Physically deliverable FX future" },
-      { label: "Long receives", value: "USD" },
-      { label: "Short receives", value: "EUR" },
+      { label: "Settlement", value: "Cash-settled in USD collateral" },
+      { label: "Long receives", value: "ETH exposure" },
+      { label: "Short receives", value: "USD collateral" },
     ],
     id: label,
     index: meta.index,
     infoBar: [
-      { label: "Contract", value: `${symbol} ${label}` },
+      { label: "Contract", value: `${contractSymbol} ${label}` },
       { label: "Mark", value: meta.mark },
       { label: "Index", value: meta.index },
       { label: "Basis", tone: "accent", value: meta.basis },
@@ -446,44 +453,44 @@ function buildEurContractMarket(
       { label: "Time to Expiry", value: meta.timeToExpiry },
     ],
     mark: meta.mark,
-    orderBookAsks: buildBook(BASE_EUR_ASKS, offset, sizeMultiplier, 4),
-    orderBookBids: buildBook(BASE_EUR_BIDS, offset, sizeMultiplier, 4),
+    orderBookAsks: buildBook(BASE_ETH_ASKS, offset, sizeMultiplier, 2),
+    orderBookBids: buildBook(BASE_ETH_BIDS, offset, sizeMultiplier, 2),
     positionOverview: [
-      { label: "Position (EUR)", value: "+375,000 EUR" },
-      { label: "Entry Price", value: Number(parseNumber(meta.mark) - 0.0024).toFixed(4) },
-      { label: "Mark Price", value: Number(parseNumber(meta.mark)).toFixed(4) },
+      { label: "Position (ETH)", value: "+30 ETH" },
+      { label: "Entry Price", value: Number(parseNumber(meta.mark) - 26).toFixed(2) },
+      { label: "Mark Price", value: Number(parseNumber(meta.mark)).toFixed(2) },
       { label: "Unrealized PnL", value: "+$1,125" },
     ],
-    ticker: `${symbol} ${label}`,
+    ticker: `${contractSymbol} ${label}`,
     timeToExpiry: meta.timeToExpiry,
-    trades: buildEurTrades(meta.mark, meta.basis),
+    trades: buildEthTrades(meta.mark, meta.basis),
   } satisfies ContractMarket;
 }
 
-function buildInstrumentMarkets(symbol: "EUR/USD" | "NGN/USD") {
-  if (symbol === "EUR/USD") {
+function buildInstrumentMarkets(symbol: "BTC/USD" | "ETH/USD") {
+  if (symbol === "ETH/USD") {
     return {
-      "DEC 2026": buildEurContractMarket(symbol, "DEC 2026", 0.0029, 0.92),
-      "JUN 2026": buildEurContractMarket(symbol, "JUN 2026", 0, 1),
-      "MAR 2026": buildEurContractMarket(symbol, "MAR 2026", -0.0009, 0.86),
-      "SEP 2026": buildEurContractMarket(symbol, "SEP 2026", 0.0012, 0.95),
+      "DEC 2026": buildEthContractMarket(symbol, "DEC 2026", 18, 0.92),
+      "JUN 2026": buildEthContractMarket(symbol, "JUN 2026", 0, 1),
+      "MAR 2026": buildEthContractMarket(symbol, "MAR 2026", -9, 0.86),
+      "SEP 2026": buildEthContractMarket(symbol, "SEP 2026", 11, 0.95),
     } satisfies Record<string, ContractMarket>;
   }
 
   return {
-    "DEC 2026": buildNgnContractMarket(symbol, "DEC 2026", 2.75, 0.72),
-    "JUN 2026": buildNgnContractMarket(symbol, "JUN 2026", 0, 1),
-    "MAR 2026": buildNgnContractMarket(symbol, "MAR 2026", -0.8, 0.78),
-    "SEP 2026": buildNgnContractMarket(symbol, "SEP 2026", 1.3, 0.88),
+    "DEC 2026": buildBtcContractMarket(symbol, "DEC 2026", 350, 0.72),
+    "JUN 2026": buildBtcContractMarket(symbol, "JUN 2026", 0, 1),
+    "MAR 2026": buildBtcContractMarket(symbol, "MAR 2026", -75, 0.78),
+    "SEP 2026": buildBtcContractMarket(symbol, "SEP 2026", 145, 0.88),
   } satisfies Record<string, ContractMarket>;
 }
 
 export const INSTRUMENT_MARKETS = {
-  "EUR/USD": buildInstrumentMarkets("EUR/USD"),
-  "NGN/USD": buildInstrumentMarkets("NGN/USD"),
+  "BTC/USD": buildInstrumentMarkets("BTC/USD"),
+  "ETH/USD": buildInstrumentMarkets("ETH/USD"),
 } satisfies Record<string, Record<string, ContractMarket>>;
 
-export const DEFAULT_SYMBOL = "NGN/USD";
+export const DEFAULT_SYMBOL = "BTC/USD";
 export const DEFAULT_CONTRACT = "JUN 2026";
 export const DEFAULT_TIMEFRAME = "1h";
 export const DEFAULT_ORDER_TYPE = "Market";
@@ -500,17 +507,17 @@ export const BOTTOM_TABS = [
 export const ACTIVITY_VIEWS = {
   "open-orders": {
     columns: ["Instrument", "Side", "Type", "Size", "Price"],
-    rows: [{ cells: ["NGN/USD JUN 2026", "Buy USD", "Limit", "25,000", "1,604.80"] }],
+    rows: [{ cells: ["BTCUSD-SQPERP JUN 2026", "Buy BTC", "Limit", "1.50", "84,180.00"] }],
   },
   positions: {
     columns: ["Instrument", "Position", "Entry Price", "Mark", "PnL"],
-    rows: [{ cells: ["NGN/USD JUN 2026", "+50,000 USD", "1,600.0", "1,605.2", "+$156"], positiveCellIndexes: [4] }],
+    rows: [{ cells: ["BTCUSD-SQPERP JUN 2026", "+5.00 BTC", "83,620.00", "84,250.00", "+$3,150"], positiveCellIndexes: [4] }],
   },
   "trade-history": {
     columns: ["Time", "Instrument", "Side", "Size", "Price"],
     rows: [
-      { cells: ["10:08:14", "NGN/USD JUN 2026", "Buy USD", "50,000", "1,605.30"] },
-      { cells: ["10:08:06", "NGN/USD JUN 2026", "Sell USD", "35,000", "1,605.20"] },
+      { cells: ["10:08:14", "BTCUSD-SQPERP JUN 2026", "Buy BTC", "2.00", "84,265.00"] },
+      { cells: ["10:08:06", "BTCUSD-SQPERP JUN 2026", "Sell BTC", "1.25", "84,250.00"] },
     ],
   },
 } satisfies Record<string, ActivityView>;

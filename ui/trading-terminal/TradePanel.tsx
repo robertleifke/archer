@@ -19,14 +19,18 @@ function LabelValueRow({ label, value }: { label: string; value: string }) {
 }
 
 export function TradePanel({
+  baseAsset,
   allocation,
   atExpiryDeliver,
   contractDetails,
   contractLabel,
+  markPrice,
   lastAction,
   orderType,
   positionOverview,
+  quoteAsset,
   postOnly,
+  settlementWallet,
   size,
   tradeSide,
   onAllocationChange,
@@ -37,14 +41,18 @@ export function TradePanel({
   onSizeChange,
   onSubmit,
 }: {
+  baseAsset: string;
   allocation: number;
   atExpiryDeliver: boolean;
   contractDetails: DeliveryTerm[];
   contractLabel: string;
+  markPrice: string;
   lastAction: string;
   orderType: "Limit" | "Market" | "Stop";
   positionOverview: DeliveryTerm[];
   postOnly: boolean;
+  quoteAsset: string;
+  settlementWallet: string;
   size: string;
   tradeSide: "buy" | "sell";
   onAllocationChange: (value: number) => void;
@@ -83,8 +91,10 @@ export function TradePanel({
             onClick={() => onSideChange("buy")}
             type="button"
           >
-            <span className="block font-semibold text-[#D1FAE5] text-sm">Buy USD</span>
-            <span className="mt-0.5 block text-[#8CC9A3] text-[11px]">Long USD / Short NGN</span>
+            <span className="block font-semibold text-[#D1FAE5] text-sm">Buy {baseAsset}</span>
+            <span className="mt-0.5 block text-[#8CC9A3] text-[11px]">
+              Long {baseAsset} / Short {quoteAsset}
+            </span>
           </button>
           <button
             className={cn(
@@ -94,15 +104,17 @@ export function TradePanel({
             onClick={() => onSideChange("sell")}
             type="button"
           >
-            <span className="block font-semibold text-[#FDE2E2] text-sm">Sell USD</span>
-            <span className="mt-0.5 block text-[#D59C9C] text-[11px]">Short USD / Long NGN</span>
+            <span className="block font-semibold text-[#FDE2E2] text-sm">Sell {baseAsset}</span>
+            <span className="mt-0.5 block text-[#D59C9C] text-[11px]">
+              Short {baseAsset} / Long {quoteAsset}
+            </span>
           </button>
         </div>
 
         <div className="space-y-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
           <LabelValueRow label="Contract" value={contractLabel} />
-          <LabelValueRow label="Available to Deliver" value="250,000 USDC" />
-          <LabelValueRow label="Settlement Wallet" value="USDC / cNGN" />
+          <LabelValueRow label="Available to Deliver" value={`250,000 ${quoteAsset}C`} />
+          <LabelValueRow label="Settlement Wallet" value={settlementWallet} />
         </div>
 
         <div className="space-y-1.5">
@@ -113,15 +125,15 @@ export function TradePanel({
             <input
               className="h-10 flex-1 bg-transparent px-3 text-[#D1D5DB] text-sm outline-none placeholder:text-[#6B7280]"
               id="trade-size"
-              onChange={(event) => onSizeChange(event.target.value.replace(/[^\d]/g, ""))}
-              placeholder="50,000"
+              onChange={(event) => onSizeChange(event.target.value.replace(/[^\d.]/g, ""))}
+              placeholder="1.00"
               value={size}
             />
             <button
               className="flex h-10 items-center gap-1 border-[#1B2430] border-l px-3 text-[#D1D5DB] text-sm"
               type="button"
             >
-              USD
+              {baseAsset}
               <ChevronDown className="size-4 text-[#6B7280]" />
             </button>
           </div>
@@ -170,14 +182,14 @@ export function TradePanel({
             onClick={() => onSubmit("buy")}
             type="button"
           >
-            Buy USD
+            Buy {baseAsset}
           </button>
           <button
             className="flex h-9 items-center justify-center rounded-sm border border-[#7F1D1D] bg-[#4D1717] font-medium text-[#D59C9C] text-sm transition-colors hover:bg-[#5b1b1b]"
             onClick={() => onSubmit("sell")}
             type="button"
           >
-            Sell USD
+            Sell {baseAsset}
           </button>
         </div>
 
@@ -194,7 +206,7 @@ export function TradePanel({
 
         <div className="space-y-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
           <div className="text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">Order Economics</div>
-          <LabelValueRow label="Order Value" value="$80,262,500 NGN" />
+          <LabelValueRow label="Order Value" value={`~${quoteAsset} ${markPrice}`} />
           <LabelValueRow label="Initial Margin" value="$4,012" />
           <LabelValueRow label="Fees" value="0.0200% / 0.0100%" />
           <div className="flex items-center justify-between text-[11px]">

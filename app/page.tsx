@@ -1,18 +1,9 @@
-import { getChainlinkNgnUsdSpot } from "@/lib/chainlink-ngn-usd";
-import type { ChainlinkSpotSnapshot } from "@/lib/chainlink-ngn-usd";
 import { getSpotHistorySnapshots } from "@/lib/exchange-api-history";
 import type { SpotHistorySnapshot } from "@/lib/exchange-api-history";
 import { TradingTerminal } from "@/ui/trading-terminal/TradingTerminal";
 
 export default async function Home() {
-  let chainlinkSpot: ChainlinkSpotSnapshot | null = null;
   let spotHistory: Record<SpotHistorySnapshot["pair"], SpotHistorySnapshot> | null = null;
-
-  try {
-    chainlinkSpot = await getChainlinkNgnUsdSpot();
-  } catch {
-    chainlinkSpot = null;
-  }
 
   try {
     spotHistory = await getSpotHistorySnapshots();
@@ -20,5 +11,5 @@ export default async function Home() {
     spotHistory = null;
   }
 
-  return <TradingTerminal chainlinkSpot={chainlinkSpot} spotHistory={spotHistory} />;
+  return <TradingTerminal spotHistory={spotHistory} />;
 }
