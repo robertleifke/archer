@@ -311,7 +311,7 @@ export function ChartPanel({
               ))}
             </div>
             <div className="text-[#6B7280] text-[11px]">
-              {chartContext === "Basis" ? "Mark minus spot in USD" : "Price in USD"}
+              {chartContext === "Basis" ? "Mark minus index in USDC" : "Price in USDC"}
             </div>
           </div>
 

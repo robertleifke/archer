@@ -87,7 +87,7 @@ export function MarketHeader({
               <button
                 aria-expanded={marketSearchOpen}
                 aria-haspopup="dialog"
-                className="flex items-center gap-2 rounded-sm border border-[#1B2430] bg-[#11161D] px-3 py-1.5 font-semibold text-[#E5E7EB] text-sm"
+                className="flex items-center gap-2 rounded-sm border border-[#1B2430] bg-[#11161D] px-3 py-2 text-left"
                 onClick={() => setMarketSearchOpen((current) => !current)}
                 type="button"
               >
@@ -102,7 +102,7 @@ export function MarketHeader({
                     />
                   </span>
                 ) : null}
-                <span>{currentSymbol}</span>
+                <span className="font-semibold text-[#E5E7EB] text-sm">{currentSymbol}</span>
                 <ChevronDown className="size-4 text-[#6B7280]" />
               </button>
 

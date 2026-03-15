@@ -176,8 +176,8 @@ export const CONTRACT_TABS = CONTRACT_LABELS.map((label) => ({
 })) satisfies ContractTab[];
 
 const FUTURES_DISPLAY_SYMBOL = {
-  "BTC/USD": "BTCUSD-SQPERP",
-  "ETH/USD": "ETHUSD-SQPERP",
+  "BTC/USD": "BTCUSDC-SQPERP",
+  "ETH/USD": "ETHUSDC-SQPERP",
 } as const satisfies Record<"BTC/USD" | "ETH/USD", string>;
 
 export const MARKET_OPTIONS = [
@@ -187,7 +187,7 @@ export const MARKET_OPTIONS = [
     lastPrice: "84,205.00",
     marketType: "Futures",
     region: "Crypto",
-    symbol: "BTCUSD-SQPERP",
+    symbol: "BTCUSDC-SQPERP",
   },
   {
     frontMonth: "PERP",
@@ -195,7 +195,7 @@ export const MARKET_OPTIONS = [
     lastPrice: "4,214.00",
     marketType: "Futures",
     region: "Crypto",
-    symbol: "ETHUSD-SQPERP",
+    symbol: "ETHUSDC-SQPERP",
   },
 ] satisfies MarketOption[];
 
@@ -278,18 +278,20 @@ function buildBtcContractMarket(
     basis: meta.basis,
     candles: buildCandles(BASE_BTC_CANDLES, offset, 0),
     contractDetails: [
-      { label: "Contract", value: `${contractSymbol} ${label}` },
+      { label: "Contract", value: contractSymbol },
       { label: "Contract Size", value: "1 BTC" },
       { label: "Tick Size", value: "$5.00" },
       { label: "Tick Value", value: "$5.00 / tick" },
-      { label: "Settlement", value: "Cash-settled in USD collateral" },
+      { label: "Settlement", value: "Cash-settled in USDC collateral" },
       { label: "Funding Rate", value: "+0.0100% / 8h" },
       { label: "Long receives", value: "BTC exposure" },
-      { label: "Short receives", value: "USD collateral" },
+      { label: "Short receives", value: "USDC collateral" },
     ],
     id: label,
     index: meta.index,
     infoBar: [
+      { label: "Contract Type", value: "Squared Perpetual" },
+      { label: "Settlement", value: "USDC" },
       { label: "Mark Price", value: meta.mark },
       { label: "24h Change", tone: "accent", value: "+2.84%" },
       { label: "24h Volume", value: meta.volume },
@@ -308,7 +310,7 @@ function buildBtcContractMarket(
       { label: "Mark Price", value: Number(parseNumber(meta.mark)).toFixed(2) },
       { label: "Unrealized PnL", value: getUnrealizedPnl(label) },
     ],
-    ticker: `${contractSymbol} ${label}`,
+    ticker: contractSymbol,
     timeToExpiry: "Perpetual",
     trades: buildBtcTrades(meta.mark, meta.basis),
   } satisfies ContractMarket;
@@ -327,18 +329,20 @@ function buildEthContractMarket(
     basis: meta.basis,
     candles: buildCandles(BASE_ETH_CANDLES, offset, 2),
     contractDetails: [
-      { label: "Contract", value: `${contractSymbol} ${label}` },
+      { label: "Contract", value: contractSymbol },
       { label: "Contract Size", value: "10 ETH" },
       { label: "Tick Size", value: "$0.50" },
       { label: "Tick Value", value: "$5.00 / tick" },
-      { label: "Settlement", value: "Cash-settled in USD collateral" },
+      { label: "Settlement", value: "Cash-settled in USDC collateral" },
       { label: "Funding Rate", value: "+0.0125% / 8h" },
       { label: "Long receives", value: "ETH exposure" },
-      { label: "Short receives", value: "USD collateral" },
+      { label: "Short receives", value: "USDC collateral" },
     ],
     id: label,
     index: meta.index,
     infoBar: [
+      { label: "Contract Type", value: "Squared Perpetual" },
+      { label: "Settlement", value: "USDC" },
       { label: "Mark Price", value: meta.mark },
       { label: "24h Change", tone: "accent", value: "+1.92%" },
       { label: "24h Volume", value: meta.volume },
@@ -357,7 +361,7 @@ function buildEthContractMarket(
       { label: "Mark Price", value: Number(parseNumber(meta.mark)).toFixed(2) },
       { label: "Unrealized PnL", value: "+$1,125" },
     ],
-    ticker: `${contractSymbol} ${label}`,
+    ticker: contractSymbol,
     timeToExpiry: "Perpetual",
     trades: buildEthTrades(meta.mark, meta.basis),
   } satisfies ContractMarket;
@@ -397,17 +401,17 @@ export const BOTTOM_TABS = [
 export const ACTIVITY_VIEWS = {
   "open-orders": {
     columns: ["Instrument", "Side", "Type", "Size", "Price"],
-    rows: [{ cells: ["BTCUSD-SQPERP PERP", "Buy BTC", "Limit", "1.50", "84,180.00"] }],
+    rows: [{ cells: ["BTCUSDC-SQPERP", "Buy BTC", "Limit", "1.50", "84,180.00"] }],
   },
   positions: {
     columns: ["Instrument", "Position", "Entry Price", "Mark", "PnL"],
-    rows: [{ cells: ["BTCUSD-SQPERP PERP", "+5.00 BTC", "83,620.00", "84,250.00", "+$3,150"], positiveCellIndexes: [4] }],
+    rows: [{ cells: ["BTCUSDC-SQPERP", "+5.00 BTC", "83,620.00", "84,250.00", "+$3,150"], positiveCellIndexes: [4] }],
   },
   "trade-history": {
     columns: ["Time", "Instrument", "Side", "Size", "Price"],
     rows: [
-      { cells: ["10:08:14", "BTCUSD-SQPERP PERP", "Buy BTC", "2.00", "84,265.00"] },
-      { cells: ["10:08:06", "BTCUSD-SQPERP PERP", "Sell BTC", "1.25", "84,250.00"] },
+      { cells: ["10:08:14", "BTCUSDC-SQPERP", "Buy BTC", "2.00", "84,265.00"] },
+      { cells: ["10:08:06", "BTCUSDC-SQPERP", "Sell BTC", "1.25", "84,250.00"] },
     ],
   },
 } satisfies Record<string, ActivityView>;

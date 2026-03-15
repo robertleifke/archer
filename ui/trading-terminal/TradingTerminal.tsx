@@ -96,7 +96,7 @@ function getBaseAsset(symbol: string) {
 }
 
 function getDisplaySymbol(symbol: keyof typeof INSTRUMENT_MARKETS, _marketType: "Futures") {
-  return symbol === "BTC/USD" ? "BTCUSD-SQPERP" : "ETHUSD-SQPERP";
+  return symbol === "BTC/USD" ? "BTCUSDC-SQPERP" : "ETHUSDC-SQPERP";
 }
 
 function getInstrumentKeyFromMarketId(marketId: string): keyof typeof INSTRUMENT_MARKETS {
@@ -403,8 +403,8 @@ export function TradingTerminal() {
               orderType={orderType}
               positionOverview={market.positionOverview}
               postOnly={postOnly}
-              quoteAsset="USD"
-              settlementWallet="USDC / USD Margin"
+              quoteAsset="USDC"
+              settlementWallet="USDC Margin"
               size={size}
               tradeSide={tradeSide}
               onAllocationChange={setAllocation}

@@ -109,7 +109,7 @@ export function TradePanel({
 
         <div className="space-y-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
           <LabelValueRow label="Contract" value={contractLabel} />
-          <LabelValueRow label="Available to Deliver" value={`250,000 ${quoteAsset}C`} />
+          <LabelValueRow label="Available to Deliver" value={`250,000 ${quoteAsset}`} />
           <LabelValueRow label="Settlement Wallet" value={settlementWallet} />
         </div>
 
