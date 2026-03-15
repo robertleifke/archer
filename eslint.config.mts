@@ -12,6 +12,11 @@ import type { ESLint, Linter } from "eslint";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 import { getDefaultAttributes } from "eslint-plugin-better-tailwindcss/api/defaults";
 import reactHooks from "eslint-plugin-react-hooks";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const configDirectory = dirname(fileURLToPath(import.meta.url));
+const tailwindEntryPoint = resolve(configDirectory, "app/globals.css");
 
 const baseLanguageOptions: Linter.LanguageOptions = {
   ecmaVersion: "latest",
@@ -58,7 +63,7 @@ const config: Linter.Config[] = [
     settings: {
       "better-tailwindcss": {
         attributes: tailwindAttributes,
-        entryPoint: "app/globals.css",
+        entryPoint: tailwindEntryPoint,
       },
     },
   },

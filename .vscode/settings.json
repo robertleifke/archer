@@ -1,8 +1,10 @@
 {
   "biome.enabled": true,
   "css.validate": false, // disable because files are TailwindCSS
+  "eslint.workingDirectories": [{ "directory": ".", "changeProcessCWD": true }],
   "eslint.useFlatConfig": true,
   "tailwindCSS.classFunctions": ["cva", "cn", "tv", "tw", "tw.*"],
+  "tailwindCSS.experimental.configFile": "app/globals.css",
   "tailwindCSS.validate": true,
   "typescript.experimental.useTsgo": true,
   "editor.codeActionsOnSave": {

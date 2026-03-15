@@ -4,6 +4,7 @@ import type { Candle } from "@/lib/trading.types";
 
 const API_VERSION = "v1";
 const CDN_BASE_URL = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api";
+const API_PUBLICATION_LAG_DAYS = 1;
 const SPOT_HISTORY_DAYS = 30;
 
 export type SpotHistorySnapshot = {
@@ -78,10 +79,13 @@ async function getHistoricalSeries(pair: "EUR/USD" | "NGN/USD") {
       ? { base: "usd", quote: "ngn" }
       : { base: "eur", quote: "usd" };
 
-  const today = new Date();
+  const latestPublishedDate = new Date();
+  latestPublishedDate.setUTCDate(latestPublishedDate.getUTCDate() - API_PUBLICATION_LAG_DAYS);
   const dates = Array.from({ length: SPOT_HISTORY_DAYS }, (_, index) => {
-    const date = new Date(today);
-    date.setUTCDate(today.getUTCDate() - (SPOT_HISTORY_DAYS - 1 - index));
+    const date = new Date(latestPublishedDate);
+    date.setUTCDate(
+      latestPublishedDate.getUTCDate() - (SPOT_HISTORY_DAYS - 1 - index),
+    );
     return formatDate(date);
   });
 

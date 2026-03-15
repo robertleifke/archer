@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import "../node_modules/tailwindcss/index.css";
 
 @source "../node_modules/tw-next-image/dist";
 
