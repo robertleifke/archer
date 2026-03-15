@@ -80,3 +80,15 @@ export type ActivityView = {
   columns: string[];
   rows: ActivityRow[];
 };
+
+export type BtcSquaredPerpSnapshot = {
+  confidence: number;
+  contractAddress: string;
+  displayIndexBtcUsd: number;
+  displayMarkBtcUsd: number;
+  fallbackUsed: boolean;
+  indexSquaredUsd: number;
+  markSquaredUsd: number;
+  markSource: "index_fallback" | "perp";
+  pair: "BTCUSDC-SQPERP";
+};

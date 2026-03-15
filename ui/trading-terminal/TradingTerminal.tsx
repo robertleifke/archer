@@ -1,9 +1,9 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import type { CHART_CONTEXT_TABS, CHART_RANGE_BUTTONS, TIMEFRAME_OPTIONS } from "@/lib/mock-trading-data";
 import type { CONTRACT_LABELS } from "@/lib/mock-trading-data";
-import type { Candle, MarketOption, MarketStat } from "@/lib/trading.types";
+import type { BtcSquaredPerpSnapshot, Candle, DeliveryTerm, MarketOption, MarketStat } from "@/lib/trading.types";
 import {
   ACTIVITY_VIEWS,
   CHART_TOOLS,
@@ -124,6 +124,7 @@ function getChartUpdateInterval(timeframe: (typeof TIMEFRAME_OPTIONS)[number]) {
 
 function getDisplayCandles(
   chartContext: (typeof CHART_CONTEXT_TABS)[number],
+  liveMark: number,
   liveBasis: number,
   marketCandles: Candle[],
   _liveIndex: number,
@@ -132,7 +133,7 @@ function getDisplayCandles(
     return shiftCandles(marketCandles, liveBasis);
   }
 
-  return marketCandles;
+  return shiftCandles(marketCandles, liveMark);
 }
 
 function getNextCandleTimeLabel(currentLabel: string) {
@@ -219,19 +220,30 @@ function buildLiveInfoBar(
   infoBar: MarketStat[],
   _marketType: "Futures",
   symbol: string,
-  _liveBasis: number,
-  _liveIndex: number,
+  liveBasis: number,
+  liveIndex: number,
 ) {
-  getIndexDigits(symbol);
-
   return infoBar.map((item: MarketStat) => {
+    if (item.label === "Mark Price") {
+      return { ...item, value: formatPrice(liveIndex + liveBasis, getIndexDigits(symbol)) };
+    }
+
     return item;
   });
 }
 
-type SelectedContract = (typeof CONTRACT_LABELS)[number];
+function replaceDeliveryValue(positionOverview: DeliveryTerm[], label: string, value: string) {
+  return positionOverview.map((item) => (item.label === label ? { ...item, value } : item));
+}
 
-export function TradingTerminal() {
+type SelectedContract = (typeof CONTRACT_LABELS)[number];
+const BTC_MARKET_POLL_INTERVAL_MS = 5000;
+
+export function TradingTerminal({
+  initialBtcSnapshot,
+}: {
+  initialBtcSnapshot: BtcSquaredPerpSnapshot | null;
+}) {
   const [selectedMarketId, setSelectedMarketId] = useState("btc-usd-futures");
   const [selectedSymbol, setSelectedSymbol] =
     useState<keyof typeof INSTRUMENT_MARKETS>(DEFAULT_SYMBOL);
@@ -254,25 +266,42 @@ export function TradingTerminal() {
   const [selectedBottomTab, setSelectedBottomTab] =
     useState<keyof typeof ACTIVITY_VIEWS>(DEFAULT_BOTTOM_TAB);
   const [filter, setFilter] = useState<(typeof FILTER_OPTIONS)[number]>(DEFAULT_FILTER);
+  const [btcSnapshot, setBtcSnapshot] = useState<BtcSquaredPerpSnapshot | null>(initialBtcSnapshot);
 
   const selectedMarket =
     MARKET_OPTIONS.find((marketOption) => marketOption.id === selectedMarketId) ??
     MARKET_OPTIONS[0];
   const market = INSTRUMENT_MARKETS[selectedSymbol][selectedContract];
+  const liveBtcMarket = selectedSymbol === "BTC/USD" && btcSnapshot !== null;
   const lastAction = buildTradeStatus(tradeSide, size, selectedSymbol, market.ticker);
-  const liveIndex = parseNumericString(market.index);
-  const liveMark = parseNumericString(market.mark);
+  const liveIndex = liveBtcMarket ? btcSnapshot.displayIndexBtcUsd : parseNumericString(market.index);
+  const liveMark = liveBtcMarket ? btcSnapshot.displayMarkBtcUsd : parseNumericString(market.mark);
   const liveBasis = liveMark - liveIndex;
-  const dynamicMarketOptions = MARKET_OPTIONS;
+  const dynamicMarketOptions = MARKET_OPTIONS.map((marketOption) => {
+    if (marketOption.id !== "btc-usd-futures" || btcSnapshot === null) {
+      return marketOption;
+    }
+
+    return {
+      ...marketOption,
+      lastPrice: formatPrice(btcSnapshot.displayMarkBtcUsd, 2),
+    };
+  });
+  const dynamicPositionOverview = replaceDeliveryValue(
+    market.positionOverview,
+    "Mark Price",
+    liveMark.toFixed(2),
+  );
   const dynamicActivityViews = buildActivityViews(
     getDisplayTicker(selectedSymbol, selectedMarket.marketType, market.ticker),
-    market.positionOverview[0]?.value ?? "",
-    market.positionOverview[1]?.value ?? "",
-    market.positionOverview[2]?.value ?? "",
-    market.positionOverview[3]?.value ?? "",
+    dynamicPositionOverview[0]?.value ?? "",
+    dynamicPositionOverview[1]?.value ?? "",
+    dynamicPositionOverview[2]?.value ?? "",
+    dynamicPositionOverview[3]?.value ?? "",
   );
   const displayCandles = getDisplayCandles(
     chartContext,
+    liveMark,
     liveBasis,
     market.candles,
     liveIndex,
@@ -287,10 +316,27 @@ export function TradingTerminal() {
   );
   const [liveCandles, setLiveCandles] = useState<Candle[]>(displayCandles);
 
+  const refreshBtcSquaredMarket = useEffectEvent(async function refreshBtcSquaredMarket() {
+    try {
+      const response = await fetch("/api/markets/btcusdc-sqperp", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      setBtcSnapshot((await response.json()) as BtcSquaredPerpSnapshot);
+    } catch {
+      // Keep the last good snapshot and let the rest of the UI continue rendering.
+    }
+  });
+
   useEffect(() => {
     setLiveCandles(
       getDisplayCandles(
         chartContext,
+        liveMark,
         liveBasis,
         market.candles,
         liveIndex,
@@ -298,6 +344,7 @@ export function TradingTerminal() {
     );
   }, [
     chartContext,
+    liveMark,
     liveBasis,
     liveIndex,
     market.candles,
@@ -314,6 +361,20 @@ export function TradingTerminal() {
 
     return () => window.clearInterval(intervalId);
   }, [selectedSymbol, selectedMarketId, timeframe, chartContext]);
+
+  useEffect(() => {
+    if (selectedSymbol !== "BTC/USD") {
+      return;
+    }
+
+    void refreshBtcSquaredMarket();
+
+    const intervalId = window.setInterval(() => {
+      void refreshBtcSquaredMarket();
+    }, BTC_MARKET_POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [selectedSymbol]);
 
   function handleContractSelect(contract: string) {
     startTransition(() => {
@@ -397,7 +458,7 @@ export function TradingTerminal() {
               markPrice={formatPrice(liveMark, getPricePrecision(selectedSymbol))}
               lastAction={lastAction}
               orderType={orderType}
-              positionOverview={market.positionOverview}
+              positionOverview={dynamicPositionOverview}
               postOnly={postOnly}
               quoteAsset="USDC"
               settlementWallet="USDC Margin"
