@@ -4,11 +4,11 @@ import { cn } from "@/lib/cn";
 
 function LabelValueRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between text-[11px]">
-      <span className="text-[#6B7280]">{label}</span>
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-start gap-x-3 text-[11px]">
+      <span className="min-w-0 text-[#6B7280]">{label}</span>
       <span
         className={cn(
-          "font-medium text-[#D1D5DB]",
+          "min-w-0 text-right font-medium text-[#D1D5DB] leading-snug wrap-break-word",
           value.startsWith("+$") && "text-[#8CC9A3]",
         )}
       >
@@ -37,7 +37,6 @@ export function TradePanel({
   onPostOnlyToggle,
   onSideChange,
   onSizeChange,
-  onSubmit,
 }: {
   baseAsset: string;
   allocation: number;
@@ -57,7 +56,6 @@ export function TradePanel({
   onPostOnlyToggle: () => void;
   onSideChange: (side: "buy" | "sell") => void;
   onSizeChange: (value: string) => void;
-  onSubmit: (side: "buy" | "sell") => void;
 }) {
   return (
     <section className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-md border border-[#1B2430] bg-[#0F1720] xl:min-h-0">
@@ -87,7 +85,7 @@ export function TradePanel({
             onClick={() => onSideChange("buy")}
             type="button"
           >
-            <span className="block font-semibold text-[#D1FAE5] text-sm">Buy {baseAsset}</span>
+            <span className="block font-semibold text-[#D1FAE5] text-sm">Long</span>
             <span className="mt-0.5 block text-[#8CC9A3] text-[11px]">
               Long {baseAsset} / Short {quoteAsset}
             </span>
@@ -100,7 +98,7 @@ export function TradePanel({
             onClick={() => onSideChange("sell")}
             type="button"
           >
-            <span className="block font-semibold text-[#FDE2E2] text-sm">Sell {baseAsset}</span>
+            <span className="block font-semibold text-[#FDE2E2] text-sm">Short</span>
             <span className="mt-0.5 block text-[#D59C9C] text-[11px]">
               Short {baseAsset} / Long {quoteAsset}
             </span>
@@ -159,23 +157,6 @@ export function TradePanel({
             <span className={cn("text-[#6B7280]", postOnly && "text-[#BFDBFE]")}>
               {postOnly ? "On" : "Off"}
             </span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-1">
-          <button
-            className="flex h-9 items-center justify-center rounded-sm border border-[#14532D] bg-[#123524] font-medium text-[#86EFAC] text-sm transition-colors hover:bg-[#17412c]"
-            onClick={() => onSubmit("buy")}
-            type="button"
-          >
-            Buy {baseAsset}
-          </button>
-          <button
-            className="flex h-9 items-center justify-center rounded-sm border border-[#7F1D1D] bg-[#4D1717] font-medium text-[#D59C9C] text-sm transition-colors hover:bg-[#5b1b1b]"
-            onClick={() => onSubmit("sell")}
-            type="button"
-          >
-            Sell {baseAsset}
           </button>
         </div>
 

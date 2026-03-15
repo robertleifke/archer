@@ -75,6 +75,13 @@ function buildActivityViews(ticker: string, positionValue: string, entryPrice: s
   };
 }
 
+function buildTradeStatus(side: "buy" | "sell", size: string, symbol: string, ticker: string) {
+  const normalizedSize = Number(size || "0").toLocaleString("en-US");
+  const action = side === "buy" ? "Long" : "Short";
+
+  return `${action} ${normalizedSize} ${getBaseAsset(symbol)} on ${ticker}`;
+}
+
 function getIndexDigits(_symbol: string) {
   return 2;
 }
@@ -247,12 +254,12 @@ export function TradingTerminal() {
   const [selectedBottomTab, setSelectedBottomTab] =
     useState<keyof typeof ACTIVITY_VIEWS>(DEFAULT_BOTTOM_TAB);
   const [filter, setFilter] = useState<(typeof FILTER_OPTIONS)[number]>(DEFAULT_FILTER);
-  const [lastAction, setLastAction] = useState("Ready");
 
   const selectedMarket =
     MARKET_OPTIONS.find((marketOption) => marketOption.id === selectedMarketId) ??
     MARKET_OPTIONS[0];
   const market = INSTRUMENT_MARKETS[selectedSymbol][selectedContract];
+  const lastAction = buildTradeStatus(tradeSide, size, selectedSymbol, market.ticker);
   const liveIndex = parseNumericString(market.index);
   const liveMark = parseNumericString(market.mark);
   const liveBasis = liveMark - liveIndex;
@@ -311,7 +318,6 @@ export function TradingTerminal() {
   function handleContractSelect(contract: string) {
     startTransition(() => {
       setSelectedContract(contract as SelectedContract);
-      setLastAction(`Switched to ${selectedSymbol} ${contract}`);
     });
   }
 
@@ -326,7 +332,6 @@ export function TradingTerminal() {
       setSelectedMarketId(marketId);
       setSelectedSymbol(getInstrumentKeyFromMarketId(nextMarket.id));
       setSelectedContract(DEFAULT_CONTRACT);
-      setLastAction(`Switched to ${nextMarket.symbol} ${nextMarket.marketType}`);
     });
   }
 
@@ -334,15 +339,6 @@ export function TradingTerminal() {
     const currentIndex = FILTER_OPTIONS.indexOf(filter);
     const next = FILTER_OPTIONS[(currentIndex + 1) % FILTER_OPTIONS.length];
     setFilter(next);
-  }
-
-  function handleSubmit(side: "buy" | "sell") {
-    const baseAsset = getBaseAsset(selectedSymbol);
-
-    setTradeSide(side);
-    setLastAction(
-      `${side === "buy" ? "Buy" : "Sell"} ${baseAsset} ${Number(size || "0").toLocaleString("en-US")} on ${market.ticker}`,
-    );
   }
 
   return (
@@ -412,7 +408,6 @@ export function TradingTerminal() {
               onPostOnlyToggle={() => setPostOnly((current) => !current)}
               onSideChange={setTradeSide}
               onSizeChange={setSize}
-              onSubmit={handleSubmit}
             />
           </div>
         </section>
