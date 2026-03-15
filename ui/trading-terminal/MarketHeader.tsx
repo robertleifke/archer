@@ -6,6 +6,18 @@ import type { ContractTab, MarketOption, MarketStat } from "@/lib/trading.types"
 import { cn } from "@/lib/cn";
 import { SmartImage } from "@/ui/SmartImage";
 
+function getMarketIcon(symbol: string) {
+  if (symbol.includes("BTC")) {
+    return "/btc.svg";
+  }
+
+  if (symbol.includes("ETH")) {
+    return "/eth.svg";
+  }
+
+  return null;
+}
+
 export function MarketHeader({
   contractTabs,
   currentContract,
@@ -25,16 +37,17 @@ export function MarketHeader({
   onContractSelect: (contract: string) => void;
   onMarketSelect: (marketId: string) => void;
 }) {
-  const primaryTabs = ["All", "Spot", "Futures"] as const;
+  const primaryTabs = ["All", "Crypto"] as const;
   const [marketSearchOpen, setMarketSearchOpen] = useState(false);
   const [marketSearch, setMarketSearch] = useState("");
   const [selectedPrimaryTab, setSelectedPrimaryTab] =
     useState<(typeof primaryTabs)[number]>("All");
   const normalizedSearch = marketSearch.trim().toLowerCase();
+  const currentMarketIcon = getMarketIcon(currentSymbol);
   const filteredMarkets = marketOptions.filter((market) => {
     const matchesPrimary =
       selectedPrimaryTab === "All" ||
-      market.marketType === selectedPrimaryTab;
+      (selectedPrimaryTab === "Crypto" && market.marketType === "Futures");
 
     if (!matchesPrimary) {
       return false;
@@ -78,7 +91,18 @@ export function MarketHeader({
                 onClick={() => setMarketSearchOpen((current) => !current)}
                 type="button"
               >
-                {currentSymbol}
+                {currentMarketIcon ? (
+                  <span className="flex size-5 items-center justify-center overflow-hidden">
+                    <SmartImage<string>
+                      alt=""
+                      aria-hidden="true"
+                      className="size-4"
+                      imgClassName="object-contain"
+                      src={currentMarketIcon}
+                    />
+                  </span>
+                ) : null}
+                <span>{currentSymbol}</span>
                 <ChevronDown className="size-4 text-[#6B7280]" />
               </button>
 
@@ -142,8 +166,17 @@ export function MarketHeader({
                           onClick={() => handleMarketPick(market.id)}
                           type="button"
                         >
-                          <span className="font-semibold text-[#E5E7EB] text-sm">
-                            {market.symbol}
+                          <span className="flex items-center gap-2 font-semibold text-[#E5E7EB] text-sm">
+                            {getMarketIcon(market.symbol) ? (
+                              <SmartImage<string>
+                                alt=""
+                                aria-hidden="true"
+                                className="size-4 shrink-0"
+                                imgClassName="object-contain"
+                                src={getMarketIcon(market.symbol) ?? ""}
+                              />
+                            ) : null}
+                            <span>{market.symbol}</span>
                           </span>
 
                           <div
@@ -171,21 +204,23 @@ export function MarketHeader({
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            {contractTabs.map((tab) => (
-              <button
-                className={cn(
-                  "rounded-sm border border-[#1B2430] bg-[#11161D] px-2 py-1 font-medium text-[#6B7280] text-[11px] transition-colors hover:border-[#2B3543] hover:text-[#D1D5DB]",
-                  currentContract === tab.label && "border-[#2563EB] bg-[#172554]/40 text-[#BFDBFE]",
-                )}
-                key={tab.label}
-                onClick={() => onContractSelect(tab.label)}
-                type="button"
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          {contractTabs.length > 1 ? (
+            <div className="flex items-center gap-1">
+              {contractTabs.map((tab) => (
+                <button
+                  className={cn(
+                    "rounded-sm border border-[#1B2430] bg-[#11161D] px-2 py-1 font-medium text-[#6B7280] text-[11px] transition-colors hover:border-[#2B3543] hover:text-[#D1D5DB]",
+                    currentContract === tab.label && "border-[#2563EB] bg-[#172554]/40 text-[#BFDBFE]",
+                  )}
+                  key={tab.label}
+                  onClick={() => onContractSelect(tab.label)}
+                  type="button"
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex h-9 flex-wrap items-center gap-2 overflow-hidden rounded-sm border border-[#1B2430] bg-[#11161D] px-3 text-[11px]">

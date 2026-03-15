@@ -21,7 +21,6 @@ function LabelValueRow({ label, value }: { label: string; value: string }) {
 export function TradePanel({
   baseAsset,
   allocation,
-  atExpiryDeliver,
   contractDetails,
   contractLabel,
   markPrice,
@@ -34,7 +33,6 @@ export function TradePanel({
   size,
   tradeSide,
   onAllocationChange,
-  onAtExpiryDeliverToggle,
   onOrderTypeChange,
   onPostOnlyToggle,
   onSideChange,
@@ -43,7 +41,6 @@ export function TradePanel({
 }: {
   baseAsset: string;
   allocation: number;
-  atExpiryDeliver: boolean;
   contractDetails: DeliveryTerm[];
   contractLabel: string;
   markPrice: string;
@@ -56,7 +53,6 @@ export function TradePanel({
   size: string;
   tradeSide: "buy" | "sell";
   onAllocationChange: (value: number) => void;
-  onAtExpiryDeliverToggle: () => void;
   onOrderTypeChange: (type: "Limit" | "Market" | "Stop") => void;
   onPostOnlyToggle: () => void;
   onSideChange: (side: "buy" | "sell") => void;
@@ -162,16 +158,6 @@ export function TradePanel({
             <span className="text-[#D1D5DB]">Post Only</span>
             <span className={cn("text-[#6B7280]", postOnly && "text-[#BFDBFE]")}>
               {postOnly ? "On" : "Off"}
-            </span>
-          </button>
-          <button
-            className="flex w-full items-center justify-between rounded-sm border border-[#1B2430] bg-[#11161D] px-2 py-1.5"
-            onClick={onAtExpiryDeliverToggle}
-            type="button"
-          >
-            <span className="text-[#D1D5DB]">At Expiry Deliver</span>
-            <span className={cn("text-[#6B7280]", atExpiryDeliver && "text-[#BFDBFE]")}>
-              {atExpiryDeliver ? "On" : "Off"}
             </span>
           </button>
         </div>

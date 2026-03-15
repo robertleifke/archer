@@ -1,7 +1,6 @@
 "use client";
 
 import { startTransition, useEffect, useState } from "react";
-import type { SpotHistorySnapshot } from "@/lib/exchange-api-history";
 import type { CHART_CONTEXT_TABS, CHART_RANGE_BUTTONS, TIMEFRAME_OPTIONS } from "@/lib/mock-trading-data";
 import type { CONTRACT_LABELS } from "@/lib/mock-trading-data";
 import type { Candle, MarketOption, MarketStat } from "@/lib/trading.types";
@@ -80,8 +79,8 @@ function getIndexDigits(_symbol: string) {
   return 2;
 }
 
-function getDisplayTicker(symbol: string, marketType: "Futures" | "Spot", ticker: string) {
-  return marketType === "Spot" ? `${symbol} Spot` : ticker;
+function getDisplayTicker(_symbol: string, _marketType: "Futures", ticker: string) {
+  return ticker;
 }
 
 function getPricePrecision(symbol: string) {
@@ -96,11 +95,7 @@ function getBaseAsset(symbol: string) {
   return symbol.split("/")[0] ?? symbol;
 }
 
-function getDisplaySymbol(symbol: keyof typeof INSTRUMENT_MARKETS, marketType: "Futures" | "Spot") {
-  if (marketType === "Spot") {
-    return symbol;
-  }
-
+function getDisplaySymbol(symbol: keyof typeof INSTRUMENT_MARKETS, _marketType: "Futures") {
   return symbol === "BTC/USD" ? "BTCUSD-SQPERP" : "ETHUSD-SQPERP";
 }
 
@@ -123,19 +118,9 @@ function getChartUpdateInterval(timeframe: (typeof TIMEFRAME_OPTIONS)[number]) {
 function getDisplayCandles(
   chartContext: (typeof CHART_CONTEXT_TABS)[number],
   liveBasis: number,
-  liveIndex: number,
   marketCandles: Candle[],
-  marketType: "Futures" | "Spot",
-  selectedSpotHistory: SpotHistorySnapshot | null,
+  _liveIndex: number,
 ) {
-  if (marketType === "Spot" && selectedSpotHistory?.series) {
-    return selectedSpotHistory.series;
-  }
-
-  if (chartContext === "Spot") {
-    return shiftCandles(marketCandles, liveIndex);
-  }
-
   if (chartContext === "Basis") {
     return shiftCandles(marketCandles, liveBasis);
   }
@@ -225,45 +210,21 @@ function simulateLiveCandles(
 
 function buildLiveInfoBar(
   infoBar: MarketStat[],
-  marketType: "Futures" | "Spot",
+  _marketType: "Futures",
   symbol: string,
-  liveBasis: number,
-  liveIndex: number,
+  _liveBasis: number,
+  _liveIndex: number,
 ) {
-  const indexDigits = getIndexDigits(symbol);
+  getIndexDigits(symbol);
 
   return infoBar.map((item: MarketStat) => {
-    if (item.label === "Contract" && marketType === "Spot") {
-      return { ...item, value: `${symbol} Spot` };
-    }
-
-    if (item.label === "Mark" && marketType === "Spot") {
-      return { ...item, value: formatPrice(liveIndex, indexDigits) };
-    }
-
-    if (item.label === "Index") {
-      return { ...item, value: formatPrice(liveIndex, indexDigits) };
-    }
-
-    if (item.label === "Basis" && marketType === "Spot") {
-      return { ...item, value: "0.00" };
-    }
-
-    if (item.label === "Basis") {
-      return { ...item, value: `${liveBasis >= 0 ? "+" : ""}${formatPrice(liveBasis, 2)}` };
-    }
-
     return item;
   });
 }
 
 type SelectedContract = (typeof CONTRACT_LABELS)[number];
 
-export function TradingTerminal({
-  spotHistory,
-}: {
-  spotHistory: Record<SpotHistorySnapshot["pair"], SpotHistorySnapshot> | null;
-}) {
+export function TradingTerminal() {
   const [selectedMarketId, setSelectedMarketId] = useState("btc-usd-futures");
   const [selectedSymbol, setSelectedSymbol] =
     useState<keyof typeof INSTRUMENT_MARKETS>(DEFAULT_SYMBOL);
@@ -283,7 +244,6 @@ export function TradingTerminal({
   const [size, setSize] = useState("1");
   const [allocation, setAllocation] = useState(20);
   const [postOnly, setPostOnly] = useState(false);
-  const [atExpiryDeliver, setAtExpiryDeliver] = useState(true);
   const [selectedBottomTab, setSelectedBottomTab] =
     useState<keyof typeof ACTIVITY_VIEWS>(DEFAULT_BOTTOM_TAB);
   const [filter, setFilter] = useState<(typeof FILTER_OPTIONS)[number]>(DEFAULT_FILTER);
@@ -293,29 +253,10 @@ export function TradingTerminal({
     MARKET_OPTIONS.find((marketOption) => marketOption.id === selectedMarketId) ??
     MARKET_OPTIONS[0];
   const market = INSTRUMENT_MARKETS[selectedSymbol][selectedContract];
-  const selectedSpotHistory =
-    selectedMarket.marketType === "Spot"
-      ? (spotHistory?.[selectedSymbol as SpotHistorySnapshot["pair"]] ?? null)
-      : null;
-  const liveIndex =
-    selectedSpotHistory?.latestPrice ??
-    parseNumericString(market.index);
+  const liveIndex = parseNumericString(market.index);
   const liveMark = parseNumericString(market.mark);
   const liveBasis = liveMark - liveIndex;
-  const dynamicMarketOptions = MARKET_OPTIONS.map((marketOption) => {
-    const instrumentKey = getInstrumentKeyFromMarketId(marketOption.id);
-    const latestSpotPrice =
-      spotHistory?.[instrumentKey as SpotHistorySnapshot["pair"]]?.latestPrice;
-
-    if (marketOption.marketType !== "Spot" || !latestSpotPrice) {
-      return marketOption;
-    }
-
-    return {
-      ...marketOption,
-      lastPrice: formatPrice(latestSpotPrice, getPricePrecision(marketOption.symbol)),
-    } satisfies MarketOption;
-  });
+  const dynamicMarketOptions = MARKET_OPTIONS;
   const dynamicActivityViews = buildActivityViews(
     getDisplayTicker(selectedSymbol, selectedMarket.marketType, market.ticker),
     market.positionOverview[0]?.value ?? "",
@@ -326,10 +267,8 @@ export function TradingTerminal({
   const displayCandles = getDisplayCandles(
     chartContext,
     liveBasis,
-    liveIndex,
     market.candles,
-    selectedMarket.marketType,
-    selectedSpotHistory,
+    liveIndex,
   );
 
   const liveInfoBar = buildLiveInfoBar(
@@ -346,10 +285,8 @@ export function TradingTerminal({
       getDisplayCandles(
         chartContext,
         liveBasis,
-        liveIndex,
         market.candles,
-        selectedMarket.marketType,
-        selectedSpotHistory,
+        liveIndex,
       ),
     );
   }, [
@@ -358,9 +295,7 @@ export function TradingTerminal({
     liveIndex,
     market.candles,
     selectedContract,
-    selectedMarket.marketType,
     selectedMarketId,
-    selectedSpotHistory,
     selectedSymbol,
     timeframe,
   ]);
@@ -391,7 +326,6 @@ export function TradingTerminal({
       setSelectedMarketId(marketId);
       setSelectedSymbol(getInstrumentKeyFromMarketId(nextMarket.id));
       setSelectedContract(DEFAULT_CONTRACT);
-      setChartContext(nextMarket.marketType === "Spot" ? "Spot" : DEFAULT_CHART_CONTEXT);
       setLastAction(`Switched to ${nextMarket.symbol} ${nextMarket.marketType}`);
     });
   }
@@ -451,7 +385,7 @@ export function TradingTerminal({
             <OrderBook
               asks={market.orderBookAsks}
               bids={market.orderBookBids}
-              contractLabel={selectedContract.replace(" ", " ").replace("2026", "26")}
+              contractLabel={selectedContract}
               trades={market.trades}
               view={orderBookView}
               onViewChange={setOrderBookView}
@@ -462,7 +396,6 @@ export function TradingTerminal({
             <TradePanel
               baseAsset={getBaseAsset(selectedSymbol)}
               allocation={allocation}
-              atExpiryDeliver={atExpiryDeliver}
               contractDetails={market.contractDetails}
               contractLabel={getDisplayTicker(selectedSymbol, selectedMarket.marketType, market.ticker)}
               markPrice={formatPrice(liveMark, getPricePrecision(selectedSymbol))}
@@ -475,7 +408,6 @@ export function TradingTerminal({
               size={size}
               tradeSide={tradeSide}
               onAllocationChange={setAllocation}
-              onAtExpiryDeliverToggle={() => setAtExpiryDeliver((current) => !current)}
               onOrderTypeChange={setOrderType}
               onPostOnlyToggle={() => setPostOnly((current) => !current)}
               onSideChange={setTradeSide}

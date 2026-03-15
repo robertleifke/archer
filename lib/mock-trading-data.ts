@@ -127,41 +127,13 @@ const BASE_ETH_BIDS = [
 ] as const;
 
 const BTC_CONTRACT_META = {
-  "DEC 2026": {
-    basis: "+220.00",
-    id: "DEC 2026",
-    index: "84,380.00",
-    mark: "84,600.00",
-    openInterest: "$134.1M",
-    timeToExpiry: "284d",
-    volume: "$28.9M",
-  },
-  "JUN 2026": {
+  PERP: {
     basis: "+70.00",
-    id: "JUN 2026",
+    id: "PERP",
     index: "84,180.00",
     mark: "84,250.00",
     openInterest: "$148.3M",
-    timeToExpiry: "101d",
     volume: "$36.2M",
-  },
-  "MAR 2026": {
-    basis: "+25.00",
-    id: "MAR 2026",
-    index: "84,180.00",
-    mark: "84,205.00",
-    openInterest: "$112.4M",
-    timeToExpiry: "11d",
-    volume: "$19.8M",
-  },
-  "SEP 2026": {
-    basis: "+130.00",
-    id: "SEP 2026",
-    index: "84,180.00",
-    mark: "84,310.00",
-    openInterest: "$129.7M",
-    timeToExpiry: "193d",
-    volume: "$24.7M",
   },
 } as const satisfies Record<
   string,
@@ -171,47 +143,18 @@ const BTC_CONTRACT_META = {
     index: string;
     mark: string;
     openInterest: string;
-    timeToExpiry: string;
     volume: string;
   }
 >;
 
 const ETH_CONTRACT_META = {
-  "DEC 2026": {
-    basis: "+18.00",
-    id: "DEC 2026",
-    index: "4,208.00",
-    mark: "4,226.00",
-    openInterest: "$91.4M",
-    timeToExpiry: "284d",
-    volume: "$18.6M",
-  },
-  "JUN 2026": {
+  PERP: {
     basis: "+6.00",
-    id: "JUN 2026",
+    id: "PERP",
     index: "4,208.00",
     mark: "4,214.00",
     openInterest: "$128.7M",
-    timeToExpiry: "101d",
     volume: "$24.9M",
-  },
-  "MAR 2026": {
-    basis: "+3.00",
-    id: "MAR 2026",
-    index: "4,208.00",
-    mark: "4,211.00",
-    openInterest: "$74.5M",
-    timeToExpiry: "11d",
-    volume: "$15.2M",
-  },
-  "SEP 2026": {
-    basis: "+11.00",
-    id: "SEP 2026",
-    index: "4,208.00",
-    mark: "4,219.00",
-    openInterest: "$109.2M",
-    timeToExpiry: "193d",
-    volume: "$21.1M",
   },
 } as const satisfies Record<
   string,
@@ -221,15 +164,14 @@ const ETH_CONTRACT_META = {
     index: string;
     mark: string;
     openInterest: string;
-    timeToExpiry: string;
     volume: string;
   }
 >;
 
-export const CONTRACT_LABELS = ["MAR 2026", "JUN 2026", "SEP 2026", "DEC 2026"] as const;
+export const CONTRACT_LABELS = ["PERP"] as const;
 
 export const CONTRACT_TABS = CONTRACT_LABELS.map((label) => ({
-  active: label === "JUN 2026",
+  active: label === "PERP",
   label,
 })) satisfies ContractTab[];
 
@@ -240,7 +182,7 @@ const FUTURES_DISPLAY_SYMBOL = {
 
 export const MARKET_OPTIONS = [
   {
-    frontMonth: "MAR26",
+    frontMonth: "PERP",
     id: "btc-usd-futures",
     lastPrice: "84,205.00",
     marketType: "Futures",
@@ -248,68 +190,20 @@ export const MARKET_OPTIONS = [
     symbol: "BTCUSD-SQPERP",
   },
   {
-    frontMonth: "SPOT",
-    id: "btc-usd-spot",
-    lastPrice: "84,180.00",
-    marketType: "Spot",
-    region: "Crypto",
-    symbol: "BTC/USD",
-  },
-  {
-    frontMonth: "JUN26",
+    frontMonth: "PERP",
     id: "eth-usd-futures",
     lastPrice: "4,214.00",
     marketType: "Futures",
     region: "Crypto",
     symbol: "ETHUSD-SQPERP",
   },
-  {
-    frontMonth: "SPOT",
-    id: "eth-usd-spot",
-    lastPrice: "4,208.00",
-    marketType: "Spot",
-    region: "Crypto",
-    symbol: "ETH/USD",
-  },
 ] satisfies MarketOption[];
 
-function getExpiryLabel(label: keyof typeof BTC_CONTRACT_META) {
-  if (label === "MAR 2026") {
-    return "March 18";
-  }
-
-  if (label === "JUN 2026") {
-    return "June 17";
-  }
-
-  if (label === "SEP 2026") {
-    return "September 16";
-  }
-
-  return "December 16";
-}
-
-function getPositionSize(label: keyof typeof BTC_CONTRACT_META) {
-  if (label === "MAR 2026") {
-    return "+2.00 BTC";
-  }
-
-  if (label === "DEC 2026") {
-    return "+1.00 BTC";
-  }
-
+function getPositionSize(_label: keyof typeof BTC_CONTRACT_META) {
   return "+5.00 BTC";
 }
 
-function getUnrealizedPnl(label: keyof typeof BTC_CONTRACT_META) {
-  if (label === "DEC 2026") {
-    return "+$1,840";
-  }
-
-  if (label === "MAR 2026") {
-    return "+$620";
-  }
-
+function getUnrealizedPnl(_label: keyof typeof BTC_CONTRACT_META) {
   return "+$3,150";
 }
 
@@ -388,21 +282,22 @@ function buildBtcContractMarket(
       { label: "Contract Size", value: "1 BTC" },
       { label: "Tick Size", value: "$5.00" },
       { label: "Tick Value", value: "$5.00 / tick" },
-      { label: "Expiry", value: `${getExpiryLabel(label)}, 2026, 16:00 UTC` },
       { label: "Settlement", value: "Cash-settled in USD collateral" },
+      { label: "Funding Rate", value: "+0.0100% / 8h" },
       { label: "Long receives", value: "BTC exposure" },
       { label: "Short receives", value: "USD collateral" },
     ],
     id: label,
     index: meta.index,
     infoBar: [
-      { label: "Contract", value: `${contractSymbol} ${label}` },
-      { label: "Mark", value: meta.mark },
-      { label: "Index", value: meta.index },
-      { label: "Basis", tone: "accent", value: meta.basis },
-      { label: "Vol", value: meta.volume },
-      { label: "OI", value: meta.openInterest },
-      { label: "Time to Expiry", value: meta.timeToExpiry },
+      { label: "Mark Price", value: meta.mark },
+      { label: "24h Change", tone: "accent", value: "+2.84%" },
+      { label: "24h Volume", value: meta.volume },
+      { label: "Open Interest", value: meta.openInterest },
+      { label: "Status", value: "Live" },
+      { label: "Funding Rate", tone: "accent", value: "+0.0100%" },
+      { label: "Next Funding", value: "01:42:18" },
+      { label: "Price Limits", value: "79,971.00 - 88,389.00" },
     ],
     mark: meta.mark,
     orderBookAsks: buildBook(BASE_BTC_ASKS, offset, sizeMultiplier, 2),
@@ -414,7 +309,7 @@ function buildBtcContractMarket(
       { label: "Unrealized PnL", value: getUnrealizedPnl(label) },
     ],
     ticker: `${contractSymbol} ${label}`,
-    timeToExpiry: meta.timeToExpiry,
+    timeToExpiry: "Perpetual",
     trades: buildBtcTrades(meta.mark, meta.basis),
   } satisfies ContractMarket;
 }
@@ -436,21 +331,22 @@ function buildEthContractMarket(
       { label: "Contract Size", value: "10 ETH" },
       { label: "Tick Size", value: "$0.50" },
       { label: "Tick Value", value: "$5.00 / tick" },
-      { label: "Expiry", value: `${getExpiryLabel(label)}, 2026, 16:00 UTC` },
       { label: "Settlement", value: "Cash-settled in USD collateral" },
+      { label: "Funding Rate", value: "+0.0125% / 8h" },
       { label: "Long receives", value: "ETH exposure" },
       { label: "Short receives", value: "USD collateral" },
     ],
     id: label,
     index: meta.index,
     infoBar: [
-      { label: "Contract", value: `${contractSymbol} ${label}` },
-      { label: "Mark", value: meta.mark },
-      { label: "Index", value: meta.index },
-      { label: "Basis", tone: "accent", value: meta.basis },
-      { label: "Vol", value: meta.volume },
-      { label: "OI", value: meta.openInterest },
-      { label: "Time to Expiry", value: meta.timeToExpiry },
+      { label: "Mark Price", value: meta.mark },
+      { label: "24h Change", tone: "accent", value: "+1.92%" },
+      { label: "24h Volume", value: meta.volume },
+      { label: "Open Interest", value: meta.openInterest },
+      { label: "Status", value: "Live" },
+      { label: "Funding Rate", tone: "accent", value: "+0.0125%" },
+      { label: "Next Funding", value: "01:42:18" },
+      { label: "Price Limits", value: "3,997.60 - 4,418.40" },
     ],
     mark: meta.mark,
     orderBookAsks: buildBook(BASE_ETH_ASKS, offset, sizeMultiplier, 2),
@@ -462,7 +358,7 @@ function buildEthContractMarket(
       { label: "Unrealized PnL", value: "+$1,125" },
     ],
     ticker: `${contractSymbol} ${label}`,
-    timeToExpiry: meta.timeToExpiry,
+    timeToExpiry: "Perpetual",
     trades: buildEthTrades(meta.mark, meta.basis),
   } satisfies ContractMarket;
 }
@@ -470,18 +366,12 @@ function buildEthContractMarket(
 function buildInstrumentMarkets(symbol: "BTC/USD" | "ETH/USD") {
   if (symbol === "ETH/USD") {
     return {
-      "DEC 2026": buildEthContractMarket(symbol, "DEC 2026", 18, 0.92),
-      "JUN 2026": buildEthContractMarket(symbol, "JUN 2026", 0, 1),
-      "MAR 2026": buildEthContractMarket(symbol, "MAR 2026", -9, 0.86),
-      "SEP 2026": buildEthContractMarket(symbol, "SEP 2026", 11, 0.95),
+      PERP: buildEthContractMarket(symbol, "PERP", 0, 1),
     } satisfies Record<string, ContractMarket>;
   }
 
   return {
-    "DEC 2026": buildBtcContractMarket(symbol, "DEC 2026", 350, 0.72),
-    "JUN 2026": buildBtcContractMarket(symbol, "JUN 2026", 0, 1),
-    "MAR 2026": buildBtcContractMarket(symbol, "MAR 2026", -75, 0.78),
-    "SEP 2026": buildBtcContractMarket(symbol, "SEP 2026", 145, 0.88),
+    PERP: buildBtcContractMarket(symbol, "PERP", 0, 1),
   } satisfies Record<string, ContractMarket>;
 }
 
@@ -491,7 +381,7 @@ export const INSTRUMENT_MARKETS = {
 } satisfies Record<string, Record<string, ContractMarket>>;
 
 export const DEFAULT_SYMBOL = "BTC/USD";
-export const DEFAULT_CONTRACT = "JUN 2026";
+export const DEFAULT_CONTRACT = "PERP";
 export const DEFAULT_TIMEFRAME = "1h";
 export const DEFAULT_ORDER_TYPE = "Market";
 export const DEFAULT_CHART_CONTEXT = "Futures";
@@ -507,17 +397,17 @@ export const BOTTOM_TABS = [
 export const ACTIVITY_VIEWS = {
   "open-orders": {
     columns: ["Instrument", "Side", "Type", "Size", "Price"],
-    rows: [{ cells: ["BTCUSD-SQPERP JUN 2026", "Buy BTC", "Limit", "1.50", "84,180.00"] }],
+    rows: [{ cells: ["BTCUSD-SQPERP PERP", "Buy BTC", "Limit", "1.50", "84,180.00"] }],
   },
   positions: {
     columns: ["Instrument", "Position", "Entry Price", "Mark", "PnL"],
-    rows: [{ cells: ["BTCUSD-SQPERP JUN 2026", "+5.00 BTC", "83,620.00", "84,250.00", "+$3,150"], positiveCellIndexes: [4] }],
+    rows: [{ cells: ["BTCUSD-SQPERP PERP", "+5.00 BTC", "83,620.00", "84,250.00", "+$3,150"], positiveCellIndexes: [4] }],
   },
   "trade-history": {
     columns: ["Time", "Instrument", "Side", "Size", "Price"],
     rows: [
-      { cells: ["10:08:14", "BTCUSD-SQPERP JUN 2026", "Buy BTC", "2.00", "84,265.00"] },
-      { cells: ["10:08:06", "BTCUSD-SQPERP JUN 2026", "Sell BTC", "1.25", "84,250.00"] },
+      { cells: ["10:08:14", "BTCUSD-SQPERP PERP", "Buy BTC", "2.00", "84,265.00"] },
+      { cells: ["10:08:06", "BTCUSD-SQPERP PERP", "Sell BTC", "1.25", "84,250.00"] },
     ],
   },
 } satisfies Record<string, ActivityView>;
@@ -531,7 +421,7 @@ export const FOOTER_LINKS = [
 ] as const;
 
 export const CHART_RANGE_BUTTONS = ["5y", "1y", "6m", "3m", "1m", "5d", "1d"] as const;
-export const CHART_CONTEXT_TABS = ["Futures", "Spot", "Basis"] as const;
+export const CHART_CONTEXT_TABS = ["Futures", "Basis"] as const;
 export const TIMEFRAME_OPTIONS = ["5m", "1h", "D"] as const;
 
 export const CHART_TOOLS = [

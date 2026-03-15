@@ -45,7 +45,7 @@ export type MarketOption = {
   frontMonth: string;
   id: string;
   lastPrice: string;
-  marketType: "Futures" | "Spot";
+  marketType: "Futures";
   region: "Crypto";
   symbol: string;
 };
