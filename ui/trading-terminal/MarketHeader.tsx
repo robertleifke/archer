@@ -7,6 +7,10 @@ import { cn } from "@/lib/cn";
 import { SmartImage } from "@/ui/SmartImage";
 
 function getMarketIcon(symbol: string) {
+  if (symbol.includes("NGN")) {
+    return "/flags/ng.svg";
+  }
+
   if (symbol.includes("BTC")) {
     return "/btc.svg";
   }
@@ -16,6 +20,15 @@ function getMarketIcon(symbol: string) {
   }
 
   return null;
+}
+
+function getMarketLabelParts(symbol: string) {
+  const [baseSymbol, contractLabel] = symbol.split("-");
+
+  return {
+    baseSymbol: baseSymbol ?? symbol,
+    contractLabel: contractLabel ?? "",
+  };
 }
 
 export function MarketHeader({
@@ -37,7 +50,7 @@ export function MarketHeader({
   onContractSelect: (contract: string) => void;
   onMarketSelect: (marketId: string) => void;
 }) {
-  const primaryTabs = ["All", "Crypto"] as const;
+  const primaryTabs = ["All", "Crypto", "FX"] as const;
   const [marketSearchOpen, setMarketSearchOpen] = useState(false);
   const [marketSearch, setMarketSearch] = useState("");
   const [selectedPrimaryTab, setSelectedPrimaryTab] =
@@ -47,7 +60,8 @@ export function MarketHeader({
   const filteredMarkets = marketOptions.filter((market) => {
     const matchesPrimary =
       selectedPrimaryTab === "All" ||
-      (selectedPrimaryTab === "Crypto" && market.marketType === "Futures");
+      (selectedPrimaryTab === "Crypto" && market.region === "Crypto") ||
+      (selectedPrimaryTab === "FX" && market.region === "FX");
 
     if (!matchesPrimary) {
       return false;
@@ -148,25 +162,28 @@ export function MarketHeader({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-3 border-[#1B2430] border-b px-3 py-2 text-[#9CA3AF] text-[11px] uppercase tracking-[0.12em]">
+                  <div className="grid grid-cols-[minmax(0,1fr)_78px_96px] gap-3 border-[#1B2430] border-b px-3 py-2 text-[#9CA3AF] text-[11px] uppercase tracking-[0.12em]">
                     <span>Symbol</span>
                     <span>Contract</span>
-                    <span>Last Price</span>
+                    <span className="text-right">Last Price</span>
                   </div>
 
                   <div className="max-h-72 overflow-y-auto">
                     {filteredMarkets.length ? (
-                      filteredMarkets.map((market) => (
-                        <button
+                      filteredMarkets.map((market) => {
+                        const { baseSymbol, contractLabel } = getMarketLabelParts(market.symbol);
+
+                        return (
+                          <button
                           className={cn(
-                            "grid w-full grid-cols-[1fr_auto_auto] items-center gap-3 border-[#1B2430] border-b px-3 py-2.5 text-left transition-colors hover:bg-[#151B23]/40",
+                            "grid w-full grid-cols-[minmax(0,1fr)_78px_96px] items-center gap-3 border-[#1B2430] border-b px-3 py-2.5 text-left transition-colors hover:bg-[#151B23]/40",
                             currentMarketId === market.id && "bg-[#172554]/20",
                           )}
                           key={market.id}
                           onClick={() => handleMarketPick(market.id)}
                           type="button"
                         >
-                          <span className="flex items-center gap-2 font-semibold text-[#E5E7EB] text-sm">
+                          <span className="flex min-w-0 items-center gap-2 font-semibold text-[#E5E7EB] text-sm">
                             {getMarketIcon(market.symbol) ? (
                               <SmartImage<string>
                                 alt=""
@@ -176,7 +193,7 @@ export function MarketHeader({
                                 src={getMarketIcon(market.symbol) ?? ""}
                               />
                             ) : null}
-                            <span>{market.symbol}</span>
+                            <span className="truncate">{baseSymbol}</span>
                           </span>
 
                           <div
@@ -185,14 +202,15 @@ export function MarketHeader({
                               currentMarketId === market.id ? "text-[#BFDBFE]" : "text-[#9CA3AF]",
                             )}
                           >
-                            {market.frontMonth}
+                            {contractLabel || market.frontMonth}
                           </div>
 
-                          <span className="font-semibold text-[#D1D5DB] text-[11px]">
+                          <span className="text-right font-semibold text-[#D1D5DB] text-[11px]">
                             {market.lastPrice}
                           </span>
-                        </button>
-                      ))
+                          </button>
+                        );
+                      })
                     ) : (
                       <div className="px-3 py-8 text-center text-[#6B7280] text-sm">
                         No markets match &quot;{marketSearch}&quot;

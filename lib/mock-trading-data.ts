@@ -126,6 +126,55 @@ const BASE_ETH_BIDS = [
   { price: 4208, size: 14, total: 202 },
 ] as const;
 
+const BASE_NGN_CANDLES = [
+  [1538.4, 1540.2, 1536.8, 1539.6, 520],
+  [1539.6, 1542.1, 1538.5, 1541.4, 536],
+  [1541.4, 1543.8, 1540.3, 1542.9, 548],
+  [1542.9, 1545.2, 1541.7, 1544.6, 561],
+  [1544.6, 1546.9, 1542.4, 1543.8, 552],
+  [1543.8, 1547.1, 1542.9, 1545.7, 569],
+  [1545.7, 1548.4, 1544.3, 1547.6, 583],
+  [1547.6, 1550.1, 1546.2, 1549.2, 596],
+  [1549.2, 1551.8, 1547.5, 1550.6, 612],
+  [1550.6, 1553.4, 1549.1, 1552.3, 628],
+  [1552.3, 1554.2, 1550.7, 1551.5, 619],
+  [1551.5, 1553.1, 1548.9, 1549.8, 601],
+  [1549.8, 1551.2, 1547.4, 1548.6, 587],
+  [1548.6, 1550.8, 1546.9, 1547.9, 574],
+  [1547.9, 1549.7, 1545.5, 1546.8, 562],
+  [1546.8, 1548.9, 1544.7, 1547.2, 553],
+  [1547.2, 1549.1, 1545.8, 1548.1, 545],
+  [1548.1, 1550.3, 1546.6, 1549.4, 557],
+  [1549.4, 1551.1, 1547.8, 1550.2, 568],
+  [1550.2, 1552.5, 1548.9, 1551.7, 579],
+  [1551.7, 1553.6, 1550.1, 1552.8, 591],
+  [1552.8, 1554.4, 1550.9, 1551.9, 583],
+  [1551.9, 1553.2, 1549.7, 1550.8, 571],
+  [1550.8, 1552.6, 1548.8, 1549.9, 560],
+  [1549.9, 1551.8, 1548.2, 1550.7, 567],
+  [1550.7, 1552.9, 1549.4, 1551.6, 576],
+  [1551.6, 1553.5, 1549.8, 1552.4, 588],
+  [1552.4, 1554.1, 1550.6, 1553.2, 600],
+] as const;
+
+const BASE_NGN_ASKS = [
+  { price: 1553.4, size: 140_000, total: 1_120_000 },
+  { price: 1553.6, size: 160_000, total: 980_000 },
+  { price: 1553.8, size: 180_000, total: 820_000 },
+  { price: 1554.0, size: 200_000, total: 640_000 },
+  { price: 1554.2, size: 220_000, total: 440_000 },
+  { price: 1554.4, size: 240_000, total: 220_000 },
+] as const;
+
+const BASE_NGN_BIDS = [
+  { price: 1553.0, size: 240_000, total: 240_000 },
+  { price: 1552.8, size: 220_000, total: 460_000 },
+  { price: 1552.6, size: 200_000, total: 660_000 },
+  { price: 1552.4, size: 180_000, total: 840_000 },
+  { price: 1552.2, size: 160_000, total: 1_000_000 },
+  { price: 1552.0, size: 140_000, total: 1_140_000 },
+] as const;
+
 const BTC_CONTRACT_META = {
   PERP: {
     basis: "+70.00",
@@ -168,6 +217,27 @@ const ETH_CONTRACT_META = {
   }
 >;
 
+const NGN_CONTRACT_META = {
+  PERP: {
+    basis: "+1.80",
+    id: "PERP",
+    index: "1,551.40",
+    mark: "1,553.20",
+    openInterest: "$8.6M",
+    volume: "$2.1M",
+  },
+} as const satisfies Record<
+  string,
+  {
+    basis: string;
+    id: string;
+    index: string;
+    mark: string;
+    openInterest: string;
+    volume: string;
+  }
+>;
+
 export const CONTRACT_LABELS = ["PERP"] as const;
 
 export const CONTRACT_TABS = CONTRACT_LABELS.map((label) => ({
@@ -178,11 +248,12 @@ export const CONTRACT_TABS = CONTRACT_LABELS.map((label) => ({
 const FUTURES_DISPLAY_SYMBOL = {
   "BTC/USD": "BTCUSDC-SQPERP",
   "ETH/USD": "ETHUSDC-SQPERP",
-} as const satisfies Record<"BTC/USD" | "ETH/USD", string>;
+  "NGN/USD": "NGNUSDC-SQPERP",
+} as const satisfies Record<"BTC/USD" | "ETH/USD" | "NGN/USD", string>;
 
 export const MARKET_OPTIONS = [
   {
-    frontMonth: "PERP",
+    frontMonth: "SQPERP",
     id: "btc-usd-futures",
     lastPrice: "84,205.00",
     marketType: "Futures",
@@ -191,11 +262,27 @@ export const MARKET_OPTIONS = [
   },
   {
     frontMonth: "PERP",
-    id: "eth-usd-futures",
-    lastPrice: "4,214.00",
+    id: "btc-usdc-perp-futures",
+    lastPrice: "84,205.00",
     marketType: "Futures",
     region: "Crypto",
-    symbol: "ETHUSDC-SQPERP",
+    symbol: "BTCUSDC-PERP",
+  },
+  {
+    frontMonth: "SQPERP",
+    id: "ngn-usdc-sqperp-futures",
+    lastPrice: "1,553.20",
+    marketType: "Futures",
+    region: "FX",
+    symbol: "NGNUSDC-SQPERP",
+  },
+  {
+    frontMonth: "PERP",
+    id: "ngn-usdc-perp-futures",
+    lastPrice: "1,553.20",
+    marketType: "Futures",
+    region: "FX",
+    symbol: "NGNUSDC-PERP",
   },
 ] satisfies MarketOption[];
 
@@ -262,6 +349,19 @@ function buildEthTrades(mark: string, basis: string) {
     { price: Number((markNumber - 1).toFixed(2)), side: "sell", size: 16, time: "10:07:53" },
     { price: Number((markNumber + basisNumber / 6).toFixed(2)), side: "buy", size: 10, time: "10:07:41" },
     { price: Number(markNumber.toFixed(2)), side: "buy", size: 8, time: "10:07:17" },
+  ] satisfies TradePrint[];
+}
+
+function buildNgnTrades(mark: string, basis: string) {
+  const markNumber = parseNumber(mark);
+  const basisNumber = parseNumber(basis);
+
+  return [
+    { price: Number((markNumber + 0.4).toFixed(2)), side: "buy", size: 120_000, time: "10:08:14" },
+    { price: Number(markNumber.toFixed(2)), side: "sell", size: 90_000, time: "10:08:06" },
+    { price: Number((markNumber - 0.3).toFixed(2)), side: "sell", size: 150_000, time: "10:07:53" },
+    { price: Number((markNumber + basisNumber / 8).toFixed(2)), side: "buy", size: 110_000, time: "10:07:41" },
+    { price: Number(markNumber.toFixed(2)), side: "buy", size: 80_000, time: "10:07:17" },
   ] satisfies TradePrint[];
 }
 
@@ -367,7 +467,64 @@ function buildEthContractMarket(
   } satisfies ContractMarket;
 }
 
-function buildInstrumentMarkets(symbol: "BTC/USD" | "ETH/USD") {
+function buildNgnContractMarket(
+  symbol: "NGN/USD",
+  label: keyof typeof NGN_CONTRACT_META,
+  offset: number,
+  sizeMultiplier: number,
+) {
+  const meta = NGN_CONTRACT_META[label];
+  const contractSymbol = FUTURES_DISPLAY_SYMBOL[symbol];
+
+  return {
+    basis: meta.basis,
+    candles: buildCandles(BASE_NGN_CANDLES, offset, 2),
+    contractDetails: [
+      { label: "Contract", value: contractSymbol },
+      { label: "Contract Size", value: "100,000 NGN" },
+      { label: "Tick Size", value: "$0.10" },
+      { label: "Tick Value", value: "$10.00 / tick" },
+      { label: "Settlement", value: "Cash-settled in USDC collateral" },
+      { label: "Funding Rate", value: "+0.0060% / 8h" },
+      { label: "Long receives", value: "NGN exposure" },
+      { label: "Short receives", value: "USDC collateral" },
+    ],
+    id: label,
+    index: meta.index,
+    infoBar: [
+      { label: "Contract Type", value: "Squared Perpetual" },
+      { label: "Settlement", value: "USDC" },
+      { label: "Mark Price", value: meta.mark },
+      { label: "24h Change", tone: "accent", value: "+0.74%" },
+      { label: "24h Volume", value: meta.volume },
+      { label: "Open Interest", value: meta.openInterest },
+      { label: "Status", value: "Live" },
+      { label: "Funding Rate", tone: "accent", value: "+0.0060%" },
+      { label: "Next Funding", value: "03:12:44" },
+      { label: "Price Limits", value: "1,473.83 - 1,628.97" },
+    ],
+    mark: meta.mark,
+    orderBookAsks: buildBook(BASE_NGN_ASKS, offset, sizeMultiplier, 2),
+    orderBookBids: buildBook(BASE_NGN_BIDS, offset, sizeMultiplier, 2),
+    positionOverview: [
+      { label: "Position (NGN)", value: "+250,000 NGN" },
+      { label: "Entry Price", value: Number(parseNumber(meta.mark) - 7.8).toFixed(2) },
+      { label: "Mark Price", value: Number(parseNumber(meta.mark)).toFixed(2) },
+      { label: "Unrealized PnL", value: "+$412" },
+    ],
+    ticker: contractSymbol,
+    timeToExpiry: "Perpetual",
+    trades: buildNgnTrades(meta.mark, meta.basis),
+  } satisfies ContractMarket;
+}
+
+function buildInstrumentMarkets(symbol: "BTC/USD" | "ETH/USD" | "NGN/USD") {
+  if (symbol === "NGN/USD") {
+    return {
+      PERP: buildNgnContractMarket(symbol, "PERP", 0, 1),
+    } satisfies Record<string, ContractMarket>;
+  }
+
   if (symbol === "ETH/USD") {
     return {
       PERP: buildEthContractMarket(symbol, "PERP", 0, 1),
@@ -382,6 +539,7 @@ function buildInstrumentMarkets(symbol: "BTC/USD" | "ETH/USD") {
 export const INSTRUMENT_MARKETS = {
   "BTC/USD": buildInstrumentMarkets("BTC/USD"),
   "ETH/USD": buildInstrumentMarkets("ETH/USD"),
+  "NGN/USD": buildInstrumentMarkets("NGN/USD"),
 } satisfies Record<string, Record<string, ContractMarket>>;
 
 export const DEFAULT_SYMBOL = "BTC/USD";

@@ -29,7 +29,7 @@ export function LiveTabTitle({
       }
     }
 
-    document.title = `${prefix}$${formatted} ${pair} | Numo`;
+    document.title = `${prefix}$${formatted} ${pair} | Archer`;
 
     prevPriceRef.current = price;
   }, [pair, price]);

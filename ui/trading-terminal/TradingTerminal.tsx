@@ -3,7 +3,7 @@
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import type { CHART_CONTEXT_TABS, CHART_RANGE_BUTTONS, TIMEFRAME_OPTIONS } from "@/lib/mock-trading-data";
 import type { CONTRACT_LABELS } from "@/lib/mock-trading-data";
-import type { BtcSquaredPerpSnapshot, Candle, DeliveryTerm, MarketOption, MarketStat } from "@/lib/trading.types";
+import type { BtcSquaredPerpSnapshot, Candle, DeliveryTerm, MarketStat, NgnSquaredPerpSnapshot } from "@/lib/trading.types";
 import {
   ACTIVITY_VIEWS,
   CHART_TOOLS,
@@ -86,10 +86,6 @@ function getIndexDigits(_symbol: string) {
   return 2;
 }
 
-function getDisplayTicker(_symbol: string, _marketType: "Futures", ticker: string) {
-  return ticker;
-}
-
 function getPricePrecision(symbol: string) {
   return symbol === "BTC/USD" ? 0 : 2;
 }
@@ -102,12 +98,16 @@ function getBaseAsset(symbol: string) {
   return symbol.split("/")[0] ?? symbol;
 }
 
-function getDisplaySymbol(symbol: keyof typeof INSTRUMENT_MARKETS, _marketType: "Futures") {
-  return symbol === "BTC/USD" ? "BTCUSDC-SQPERP" : "ETHUSDC-SQPERP";
-}
-
 function getInstrumentKeyFromMarketId(marketId: string): keyof typeof INSTRUMENT_MARKETS {
-  return marketId.startsWith("btc-") ? "BTC/USD" : "ETH/USD";
+  if (marketId.startsWith("btc-")) {
+    return "BTC/USD";
+  }
+
+  if (marketId.startsWith("ngn-")) {
+    return "NGN/USD";
+  }
+
+  return "ETH/USD";
 }
 
 function getChartUpdateInterval(timeframe: (typeof TIMEFRAME_OPTIONS)[number]) {
@@ -238,11 +238,14 @@ function replaceDeliveryValue(positionOverview: DeliveryTerm[], label: string, v
 
 type SelectedContract = (typeof CONTRACT_LABELS)[number];
 const BTC_MARKET_POLL_INTERVAL_MS = 5000;
+const NGN_MARKET_POLL_INTERVAL_MS = 30_000;
 
 export function TradingTerminal({
   initialBtcSnapshot,
+  initialNgnSnapshot,
 }: {
   initialBtcSnapshot: BtcSquaredPerpSnapshot | null;
+  initialNgnSnapshot: NgnSquaredPerpSnapshot | null;
 }) {
   const [selectedMarketId, setSelectedMarketId] = useState("btc-usd-futures");
   const [selectedSymbol, setSelectedSymbol] =
@@ -267,25 +270,43 @@ export function TradingTerminal({
     useState<keyof typeof ACTIVITY_VIEWS>(DEFAULT_BOTTOM_TAB);
   const [filter, setFilter] = useState<(typeof FILTER_OPTIONS)[number]>(DEFAULT_FILTER);
   const [btcSnapshot, setBtcSnapshot] = useState<BtcSquaredPerpSnapshot | null>(initialBtcSnapshot);
+  const [ngnSnapshot, setNgnSnapshot] = useState<NgnSquaredPerpSnapshot | null>(initialNgnSnapshot);
 
   const selectedMarket =
     MARKET_OPTIONS.find((marketOption) => marketOption.id === selectedMarketId) ??
     MARKET_OPTIONS[0];
   const market = INSTRUMENT_MARKETS[selectedSymbol][selectedContract];
+  const displayTicker = selectedMarket.symbol;
   const liveBtcMarket = selectedSymbol === "BTC/USD" && btcSnapshot !== null;
-  const lastAction = buildTradeStatus(tradeSide, size, selectedSymbol, market.ticker);
-  const liveIndex = liveBtcMarket ? btcSnapshot.displayIndexBtcUsd : parseNumericString(market.index);
-  const liveMark = liveBtcMarket ? btcSnapshot.displayMarkBtcUsd : parseNumericString(market.mark);
+  const liveNgnMarket = selectedSymbol === "NGN/USD" && ngnSnapshot !== null;
+  const lastAction = buildTradeStatus(tradeSide, size, selectedSymbol, displayTicker);
+  let liveIndex = parseNumericString(market.index);
+  let liveMark = parseNumericString(market.mark);
+
+  if (liveBtcMarket) {
+    liveIndex = btcSnapshot.displayIndexBtcUsd;
+    liveMark = btcSnapshot.displayMarkBtcUsd;
+  } else if (liveNgnMarket) {
+    liveIndex = ngnSnapshot.displayIndexNgnPerUsd;
+    liveMark = ngnSnapshot.displayMarkNgnPerUsd;
+  }
   const liveBasis = liveMark - liveIndex;
   const dynamicMarketOptions = MARKET_OPTIONS.map((marketOption) => {
-    if (marketOption.id !== "btc-usd-futures" || btcSnapshot === null) {
-      return marketOption;
+    if (marketOption.id === "btc-usd-futures" && btcSnapshot !== null) {
+      return {
+        ...marketOption,
+        lastPrice: formatPrice(btcSnapshot.displayMarkBtcUsd, 2),
+      };
     }
 
-    return {
-      ...marketOption,
-      lastPrice: formatPrice(btcSnapshot.displayMarkBtcUsd, 2),
-    };
+    if ((marketOption.id === "ngn-usdc-sqperp-futures" || marketOption.id === "ngn-usdc-perp-futures") && ngnSnapshot !== null) {
+      return {
+        ...marketOption,
+        lastPrice: formatPrice(ngnSnapshot.displayMarkNgnPerUsd, 2),
+      };
+    }
+
+    return marketOption;
   });
   const dynamicPositionOverview = replaceDeliveryValue(
     market.positionOverview,
@@ -293,7 +314,7 @@ export function TradingTerminal({
     liveMark.toFixed(2),
   );
   const dynamicActivityViews = buildActivityViews(
-    getDisplayTicker(selectedSymbol, selectedMarket.marketType, market.ticker),
+    displayTicker,
     dynamicPositionOverview[0]?.value ?? "",
     dynamicPositionOverview[1]?.value ?? "",
     dynamicPositionOverview[2]?.value ?? "",
@@ -327,6 +348,22 @@ export function TradingTerminal({
       }
 
       setBtcSnapshot((await response.json()) as BtcSquaredPerpSnapshot);
+    } catch {
+      // Keep the last good snapshot and let the rest of the UI continue rendering.
+    }
+  });
+
+  const refreshNgnMarket = useEffectEvent(async function refreshNgnMarket() {
+    try {
+      const response = await fetch("/api/markets/ngnusdc", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      setNgnSnapshot((await response.json()) as NgnSquaredPerpSnapshot);
     } catch {
       // Keep the last good snapshot and let the rest of the UI continue rendering.
     }
@@ -376,6 +413,20 @@ export function TradingTerminal({
     return () => window.clearInterval(intervalId);
   }, [selectedSymbol]);
 
+  useEffect(() => {
+    if (selectedSymbol !== "NGN/USD") {
+      return;
+    }
+
+    void refreshNgnMarket();
+
+    const intervalId = window.setInterval(() => {
+      void refreshNgnMarket();
+    }, NGN_MARKET_POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [selectedSymbol]);
+
   function handleContractSelect(contract: string) {
     startTransition(() => {
       setSelectedContract(contract as SelectedContract);
@@ -411,7 +462,7 @@ export function TradingTerminal({
           contractTabs={CONTRACT_TABS}
           currentContract={selectedContract}
           currentMarketId={selectedMarketId}
-          currentSymbol={getDisplaySymbol(selectedSymbol, selectedMarket.marketType)}
+          currentSymbol={displayTicker}
           infoBar={liveInfoBar}
           marketOptions={dynamicMarketOptions}
           onContractSelect={handleContractSelect}
@@ -428,7 +479,7 @@ export function TradingTerminal({
               selectedRange={selectedRange}
               selectedTimeframe={timeframe}
               selectedTool={selectedTool}
-              ticker={getDisplayTicker(selectedSymbol, selectedMarket.marketType, market.ticker)}
+              ticker={displayTicker}
               onChartContextChange={setChartContext}
               onExpandedToggle={() => setExpandedChart((current) => !current)}
               onIndicatorsToggle={() => setIndicatorsEnabled((current) => !current)}
@@ -454,7 +505,7 @@ export function TradingTerminal({
               baseAsset={getBaseAsset(selectedSymbol)}
               allocation={allocation}
               contractDetails={market.contractDetails}
-              contractLabel={getDisplayTicker(selectedSymbol, selectedMarket.marketType, market.ticker)}
+              contractLabel={displayTicker}
               markPrice={formatPrice(liveMark, getPricePrecision(selectedSymbol))}
               lastAction={lastAction}
               orderType={orderType}

@@ -1,20 +1,19 @@
 import "server-only";
 
-const BASE_MAINNET_RPC_URL = "https://mainnet.base.org";
+import type { NgnUsdSpotSnapshot } from "@/lib/trading.types";
+
+const DEFAULT_BASE_MAINNET_RPC_URL = "https://mainnet.base.org";
 const CHAINLINK_NGN_USD_FEED_ADDRESS = "0xdfbb5Cbc88E382de007bfe6CE99C388176ED80aD";
 const DECIMALS_SELECTOR = "0x313ce567";
 const LATEST_ROUND_DATA_SELECTOR = "0xfeaf968c";
 
-export type ChainlinkSpotSnapshot = {
-  contractAddress: string;
-  feedUrl: string;
-  pair: "NGN/USD";
-  priceNgnPerUsd: number;
-  updatedAt: number | null;
-};
+function getBaseMainnetRpcUrl() {
+  return process.env.BASE_RPC_URL?.trim() || DEFAULT_BASE_MAINNET_RPC_URL;
+}
 
 async function callBaseRpc(data: string) {
-  const response = await fetch(BASE_MAINNET_RPC_URL, {
+  const response = await fetch(getBaseMainnetRpcUrl(), {
+    cache: "no-store",
     body: JSON.stringify({
       id: 1,
       jsonrpc: "2.0",
@@ -31,9 +30,6 @@ async function callBaseRpc(data: string) {
       "content-type": "application/json",
     },
     method: "POST",
-    next: {
-      revalidate: 30,
-    },
   });
 
   if (!response.ok) {
@@ -79,7 +75,7 @@ function invertNgnUsdToNgnPerUsd(answer: bigint, decimals: number) {
   return 1 / normalized;
 }
 
-export async function getChainlinkNgnUsdSpot(): Promise<ChainlinkSpotSnapshot> {
+export async function getChainlinkNgnUsdSpot(): Promise<NgnUsdSpotSnapshot> {
   const [decimalsHex, latestRoundDataHex] = await Promise.all([
     callBaseRpc(DECIMALS_SELECTOR),
     callBaseRpc(LATEST_ROUND_DATA_SELECTOR),
@@ -90,8 +86,9 @@ export async function getChainlinkNgnUsdSpot(): Promise<ChainlinkSpotSnapshot> {
   const updatedAt = Number(decodeUint256(readWord(latestRoundDataHex, 3)));
 
   return {
+    confidence: 1,
     contractAddress: CHAINLINK_NGN_USD_FEED_ADDRESS,
-    feedUrl: "https://data.chain.link/feeds/base/base/ngn-usd",
+    feedUrl: "https://data.chain.link/feeds/base/mainnet/ngn-usd",
     pair: "NGN/USD",
     priceNgnPerUsd: invertNgnUsdToNgnPerUsd(answer, decimals),
     updatedAt: updatedAt > 0 ? updatedAt : null,

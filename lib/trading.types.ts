@@ -46,7 +46,7 @@ export type MarketOption = {
   id: string;
   lastPrice: string;
   marketType: "Futures";
-  region: "Crypto";
+  region: "Crypto" | "FX";
   symbol: string;
 };
 
@@ -91,4 +91,25 @@ export type BtcSquaredPerpSnapshot = {
   markSquaredUsd: number;
   markSource: "index_fallback" | "perp";
   pair: "BTCUSDC-SQPERP";
+};
+
+export type NgnSquaredPerpSnapshot = {
+  confidence: number;
+  contractAddress: string;
+  displayIndexNgnPerUsd: number;
+  displayMarkNgnPerUsd: number;
+  fallbackUsed: boolean;
+  indexSquaredNgnPerUsd: number;
+  markSquaredNgnPerUsd: number;
+  markSource: "chainlink_spot_fallback" | "index_fallback" | "perp";
+  pair: "NGNUSDC-SQPERP";
+};
+
+export type NgnUsdSpotSnapshot = {
+  confidence: number;
+  contractAddress: string;
+  feedUrl: string;
+  pair: "NGN/USD";
+  priceNgnPerUsd: number;
+  updatedAt: number | null;
 };
