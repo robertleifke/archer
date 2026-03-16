@@ -248,7 +248,7 @@ export const CONTRACT_TABS = CONTRACT_LABELS.map((label) => ({
 const FUTURES_DISPLAY_SYMBOL = {
   "BTC/USD": "BTCUSDC-SQPERP",
   "ETH/USD": "ETHUSDC-SQPERP",
-  "NGN/USD": "NGNUSDC-SQPERP",
+  "NGN/USD": "NGNUSDC-PERP",
 } as const satisfies Record<"BTC/USD" | "ETH/USD" | "NGN/USD", string>;
 
 export const MARKET_OPTIONS = [
@@ -267,14 +267,6 @@ export const MARKET_OPTIONS = [
     marketType: "Futures",
     region: "Crypto",
     symbol: "BTCUSDC-PERP",
-  },
-  {
-    frontMonth: "SQPERP",
-    id: "ngn-usdc-sqperp-futures",
-    lastPrice: "1,553.20",
-    marketType: "Futures",
-    region: "FX",
-    symbol: "NGNUSDC-SQPERP",
   },
   {
     frontMonth: "PERP",

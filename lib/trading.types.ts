@@ -93,16 +93,16 @@ export type BtcSquaredPerpSnapshot = {
   pair: "BTCUSDC-SQPERP";
 };
 
-export type NgnSquaredPerpSnapshot = {
+export type NgnPerpSnapshot = {
   confidence: number;
   contractAddress: string;
   displayIndexNgnPerUsd: number;
   displayMarkNgnPerUsd: number;
-  fallbackUsed: boolean;
-  indexSquaredNgnPerUsd: number;
-  markSquaredNgnPerUsd: number;
-  markSource: "chainlink_spot_fallback" | "index_fallback" | "perp";
-  pair: "NGNUSDC-SQPERP";
+  fallbackUsed: false;
+  indexNgnPerUsd: number;
+  markNgnPerUsd: number;
+  markSource: "perp";
+  pair: "NGNUSDC-PERP";
 };
 
 export type NgnUsdSpotSnapshot = {

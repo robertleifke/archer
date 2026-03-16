@@ -3,7 +3,7 @@
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import type { CHART_CONTEXT_TABS, CHART_RANGE_BUTTONS, TIMEFRAME_OPTIONS } from "@/lib/mock-trading-data";
 import type { CONTRACT_LABELS } from "@/lib/mock-trading-data";
-import type { BtcSquaredPerpSnapshot, Candle, DeliveryTerm, MarketStat, NgnSquaredPerpSnapshot } from "@/lib/trading.types";
+import type { BtcSquaredPerpSnapshot, Candle, DeliveryTerm, MarketStat, NgnPerpSnapshot } from "@/lib/trading.types";
 import {
   ACTIVITY_VIEWS,
   CHART_TOOLS,
@@ -245,7 +245,7 @@ export function TradingTerminal({
   initialNgnSnapshot,
 }: {
   initialBtcSnapshot: BtcSquaredPerpSnapshot | null;
-  initialNgnSnapshot: NgnSquaredPerpSnapshot | null;
+  initialNgnSnapshot: NgnPerpSnapshot | null;
 }) {
   const [selectedMarketId, setSelectedMarketId] = useState("btc-usd-futures");
   const [selectedSymbol, setSelectedSymbol] =
@@ -270,7 +270,7 @@ export function TradingTerminal({
     useState<keyof typeof ACTIVITY_VIEWS>(DEFAULT_BOTTOM_TAB);
   const [filter, setFilter] = useState<(typeof FILTER_OPTIONS)[number]>(DEFAULT_FILTER);
   const [btcSnapshot, setBtcSnapshot] = useState<BtcSquaredPerpSnapshot | null>(initialBtcSnapshot);
-  const [ngnSnapshot, setNgnSnapshot] = useState<NgnSquaredPerpSnapshot | null>(initialNgnSnapshot);
+  const [ngnSnapshot, setNgnSnapshot] = useState<NgnPerpSnapshot | null>(initialNgnSnapshot);
 
   const selectedMarket =
     MARKET_OPTIONS.find((marketOption) => marketOption.id === selectedMarketId) ??
@@ -299,7 +299,7 @@ export function TradingTerminal({
       };
     }
 
-    if ((marketOption.id === "ngn-usdc-sqperp-futures" || marketOption.id === "ngn-usdc-perp-futures") && ngnSnapshot !== null) {
+    if (marketOption.id === "ngn-usdc-perp-futures" && ngnSnapshot !== null) {
       return {
         ...marketOption,
         lastPrice: formatPrice(ngnSnapshot.displayMarkNgnPerUsd, 2),
@@ -363,7 +363,7 @@ export function TradingTerminal({
         return;
       }
 
-      setNgnSnapshot((await response.json()) as NgnSquaredPerpSnapshot);
+      setNgnSnapshot((await response.json()) as NgnPerpSnapshot);
     } catch {
       // Keep the last good snapshot and let the rest of the UI continue rendering.
     }
