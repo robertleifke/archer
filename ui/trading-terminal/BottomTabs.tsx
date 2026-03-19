@@ -75,17 +75,18 @@ export function BottomTabs({
               style={{ gridTemplateColumns: `repeat(${activityView.columns.length}, minmax(0, 1fr))` }}
             >
               {row.cells.map((cell, cellIndex) => (
-                <span
+                <div
                   className={cn(
-                    "min-w-0 truncate text-[#D1D5DB]",
+                    "min-w-0 text-[#D1D5DB]",
                     cellIndex === 0 && "font-medium text-[#E5E7EB]",
+                    cellIndex !== 0 && "truncate",
                     activityView.columns[cellIndex] === "PnL" && "text-right",
                     row.positiveCellIndexes?.includes(cellIndex) && "font-medium text-[#8CC9A3]",
                   )}
-                  key={`${cell}-${cellIndex}`}
+                  key={`${rowIndex}-${cellIndex}`}
                 >
                   {cell}
-                </span>
+                </div>
               ))}
             </div>
           ))}

@@ -1,8 +1,10 @@
-import type { Candle } from "@/lib/trading.types";
+import { useState } from "react";
 import type { TIMEFRAME_OPTIONS } from "@/lib/mock-trading-data";
+import type { Candle, ConvexExposureMetrics, ConvexRiskModel } from "@/lib/trading.types";
 import { CHART_CONTEXT_TABS, CHART_RANGE_BUTTONS } from "@/lib/mock-trading-data";
 import { cn } from "@/lib/cn";
 import { ChartToolbar } from "@/ui/trading-terminal/ChartToolbar";
+import { ConvexityMetricBadge } from "@/ui/trading-terminal/ConvexityMetricBadge";
 
 type Point = {
   closeY: number;
@@ -58,15 +60,106 @@ function getChangeLabel(candles: Candle[]) {
   };
 }
 
+function getChartPoint({
+  candle,
+  chartBottom,
+  chartTop,
+  index,
+  maxPrice,
+  maxVolume,
+  priceRange,
+  stepX,
+  volumeHeight,
+}: {
+  candle: Candle;
+  chartBottom: number;
+  chartTop: number;
+  index: number;
+  maxPrice: number;
+  maxVolume: number;
+  priceRange: number;
+  stepX: number;
+  volumeHeight: number;
+}) {
+  const x = index * stepX + stepX / 2;
+
+  return {
+    closeY: chartTop + ((maxPrice - candle.close) / priceRange) * (chartBottom - chartTop),
+    highY: chartTop + ((maxPrice - candle.high) / priceRange) * (chartBottom - chartTop),
+    lowY: chartTop + ((maxPrice - candle.low) / priceRange) * (chartBottom - chartTop),
+    openY: chartTop + ((maxPrice - candle.open) / priceRange) * (chartBottom - chartTop),
+    volumeHeight: (candle.volume / maxVolume) * (volumeHeight - 12),
+    x,
+  } satisfies Point;
+}
+
+function getDeltaBand({
+  currentPriceY,
+  exposureMetrics,
+  lastClose,
+  maxPrice,
+  minPrice,
+  priceRange,
+  chartTop,
+  chartBottom,
+}: {
+  currentPriceY: number;
+  exposureMetrics?: ConvexExposureMetrics;
+  lastClose: number;
+  maxPrice: number;
+  minPrice: number;
+  priceRange: number;
+  chartTop: number;
+  chartBottom: number;
+}) {
+  if (!exposureMetrics) {
+    return {
+      bottomY: currentPriceY,
+      topY: currentPriceY,
+    };
+  }
+
+  const deltaBandWidth = Math.min(Math.abs(exposureMetrics.gammaPer1kMove) * 4000, priceRange * 0.22);
+
+  return {
+    bottomY:
+      chartTop +
+      ((maxPrice - Math.max(lastClose - deltaBandWidth, minPrice)) / priceRange) *
+        (chartBottom - chartTop),
+    topY:
+      chartTop +
+      ((maxPrice - Math.min(lastClose + deltaBandWidth, maxPrice)) / priceRange) *
+        (chartBottom - chartTop),
+  };
+}
+
+function getHoverImpact(exposureMetrics: ConvexExposureMetrics | undefined, hoverClose: number | null) {
+  if (!exposureMetrics || hoverClose === null) {
+    return 0;
+  }
+
+  return (
+    exposureMetrics.convexNotionalUsd *
+    (((hoverClose / exposureMetrics.entryReferencePrice) ** 2) -
+      ((exposureMetrics.markPrice / exposureMetrics.entryReferencePrice) ** 2)) *
+    (exposureMetrics.side === "buy" ? 1 : -1)
+  );
+}
+
 function TradingChart({
   candles,
+  exposureMetrics,
+  riskModel,
   timeframe,
   ticker,
 }: {
   candles: Candle[];
+  exposureMetrics?: ConvexExposureMetrics;
+  riskModel?: ConvexRiskModel;
   timeframe: (typeof TIMEFRAME_OPTIONS)[number];
   ticker: string;
 }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const width = 920;
   const height = 620;
   const volumeHeight = 128;
@@ -86,26 +179,38 @@ function TradingChart({
     return null;
   }
 
-  const points = candles.map((candle, index) => {
-    const x = index * stepX + stepX / 2;
-    const highY = chartTop + ((maxPrice - candle.high) / priceRange) * (chartBottom - chartTop);
-    const lowY = chartTop + ((maxPrice - candle.low) / priceRange) * (chartBottom - chartTop);
-    const openY = chartTop + ((maxPrice - candle.open) / priceRange) * (chartBottom - chartTop);
-    const closeY = chartTop + ((maxPrice - candle.close) / priceRange) * (chartBottom - chartTop);
-
-    return {
-      closeY,
-      highY,
-      lowY,
-      openY,
-      volumeHeight: (candle.volume / maxVolume) * (volumeHeight - 12),
-      x,
-    } satisfies Point;
-  });
+  const points = candles.map((candle, index) =>
+    getChartPoint({
+      candle,
+      chartBottom,
+      chartTop,
+      index,
+      maxPrice,
+      maxVolume,
+      priceRange,
+      stepX,
+      volumeHeight,
+    }),
+  );
 
   const currentPriceY =
     chartTop + ((maxPrice - lastCandle.close) / priceRange) * (chartBottom - chartTop);
+  const deltaBand = getDeltaBand({
+    chartBottom,
+    chartTop,
+    currentPriceY,
+    exposureMetrics,
+    lastClose: lastCandle.close,
+    maxPrice,
+    minPrice,
+    priceRange,
+  });
   const axisValues = Array.from({ length: 6 }, (_, index) => maxPrice - (priceRange / 5) * index);
+  const hoverPoint = hoverIndex === null ? null : points[hoverIndex];
+  const hoverCandle = hoverIndex === null ? null : candles[hoverIndex];
+  const hoverMovePercent =
+    hoverCandle && exposureMetrics ? ((hoverCandle.close - exposureMetrics.markPrice) / exposureMetrics.markPrice) * 100 : 0;
+  const hoverImpact = getHoverImpact(exposureMetrics, hoverCandle?.close ?? null);
 
   return (
     <div className="relative flex-1 overflow-hidden">
@@ -122,20 +227,53 @@ function TradingChart({
         </span>
       </div>
 
-      <svg
-        aria-label={`${ticker} candlestick chart`}
-        className="size-full"
-        preserveAspectRatio="none"
-        role="img"
-        viewBox={`0 0 ${width} ${height}`}
-      >
-        <defs>
-          <pattern height="68" id="gridPattern" patternUnits="userSpaceOnUse" width="92">
-            <path d="M 92 0 L 0 0 0 68" fill="none" stroke="#16202A" strokeWidth="0.7" />
-          </pattern>
-        </defs>
+      {exposureMetrics && riskModel ? (
+        <div className="absolute top-9 left-3 z-10 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.12em]">
+          <ConvexityMetricBadge label="Delta band" value={`${exposureMetrics.deltaEquivalentBtc.toFixed(2)} BTC`} />
+          <ConvexityMetricBadge
+            label="Gamma intensity"
+            tooltip="Normalized ladder state combining convexity risk, volatility, and inventory pressure."
+            value={riskModel.convexityRisk.toFixed(2)}
+          />
+          <ConvexityMetricBadge label="Funding" value={`${riskModel.fundingRateBps.toFixed(2)} bps`} />
+        </div>
+      ) : null}
 
-        <rect fill="url(#gridPattern)" height={height} width={width} x="0" y="0" />
+      <div
+        className="size-full"
+        onPointerLeave={() => setHoverIndex(null)}
+        onPointerMove={(event) => {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          const localX = ((event.clientX - bounds.left) / bounds.width) * width;
+          const nextIndex = Math.max(0, Math.min(candles.length - 1, Math.floor(localX / stepX)));
+          setHoverIndex(nextIndex);
+        }}
+      >
+        <svg
+          aria-label={`${ticker} candlestick chart`}
+          className="size-full"
+          preserveAspectRatio="none"
+          role="img"
+          viewBox={`0 0 ${width} ${height}`}
+        >
+          <defs>
+            <pattern height="68" id="gridPattern" patternUnits="userSpaceOnUse" width="92">
+              <path d="M 92 0 L 0 0 0 68" fill="none" stroke="#16202A" strokeWidth="0.7" />
+            </pattern>
+          </defs>
+
+          <rect fill="url(#gridPattern)" height={height} width={width} x="0" y="0" />
+
+          {exposureMetrics ? (
+            <rect
+              fill="#1D4ED8"
+              height={Math.max(deltaBand.bottomY - deltaBand.topY, 1)}
+              opacity="0.08"
+              width={plotWidth}
+              x="0"
+              y={deltaBand.topY}
+            />
+          ) : null}
 
         {axisValues.map((value) => {
           const y = chartTop + ((maxPrice - value) / priceRange) * (chartBottom - chartTop);
@@ -191,6 +329,17 @@ function TradingChart({
           y2={currentPriceY}
         />
 
+        {hoverPoint ? (
+          <line
+            stroke="#334155"
+            strokeDasharray="4 4"
+            x1={hoverPoint.x}
+            x2={hoverPoint.x}
+            y1={chartTop}
+            y2={height - 18}
+          />
+        ) : null}
+
         <g>
           <rect
             fill="#1D4ED8"
@@ -229,7 +378,25 @@ function TradingChart({
             </text>
           );
         })}
-      </svg>
+        </svg>
+      </div>
+
+      {hoverPoint && hoverCandle && exposureMetrics ? (
+        <div
+          className="pointer-events-none absolute z-20 rounded-sm border border-[#1B2430] bg-[#0E141C]/95 px-2 py-1.5 text-[11px] shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+          style={{
+            left: `min(calc(${((hoverPoint.x + 12) / width) * 100}% + 0px), calc(100% - 172px))`,
+            top: Math.max(56, hoverPoint.closeY - 16),
+          }}
+        >
+          <div className="font-medium text-[#E5E7EB]">{hoverCandle.time}</div>
+          <div className="text-[#9CA3AF]">Spot {formatPrice(hoverCandle.close)}</div>
+          <div className="text-[#9CA3AF]">Move {hoverMovePercent >= 0 ? "+" : ""}{hoverMovePercent.toFixed(2)}%</div>
+          <div className={cn("font-medium", hoverImpact >= 0 ? "text-[#8CC9A3]" : "text-[#F0A0A0]")}>
+            Position impact {hoverImpact >= 0 ? "+" : "-"}${Math.abs(hoverImpact).toFixed(0)}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -237,8 +404,10 @@ function TradingChart({
 export function ChartPanel({
   candles,
   chartContext,
+  exposureMetrics,
   expandedChart,
   indicatorsEnabled,
+  riskModel,
   selectedRange,
   selectedTimeframe,
   selectedTool,
@@ -252,8 +421,10 @@ export function ChartPanel({
 }: {
   candles: Candle[];
   chartContext: (typeof CHART_CONTEXT_TABS)[number];
+  exposureMetrics?: ConvexExposureMetrics;
   expandedChart: boolean;
   indicatorsEnabled: boolean;
+  riskModel?: ConvexRiskModel;
   selectedRange: (typeof CHART_RANGE_BUTTONS)[number];
   selectedTimeframe: (typeof TIMEFRAME_OPTIONS)[number];
   selectedTool: string;
@@ -315,7 +486,13 @@ export function ChartPanel({
             </div>
           </div>
 
-          <TradingChart candles={candles} ticker={ticker} timeframe={selectedTimeframe} />
+          <TradingChart
+            candles={candles}
+            exposureMetrics={exposureMetrics}
+            riskModel={riskModel}
+            ticker={ticker}
+            timeframe={selectedTimeframe}
+          />
 
           <div className="flex items-center justify-between border-[#1B2430] border-t bg-[#0F1720] px-2.5 py-1 text-[11px]">
             <div className="flex flex-wrap items-center gap-1">

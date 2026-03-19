@@ -5,6 +5,8 @@ import type {
   DeliveryTerm,
 } from "@/lib/trading.types";
 import { cn } from "@/lib/cn";
+import { ConvexityExposureCard } from "@/ui/trading-terminal/ConvexityExposureCard";
+import { PositionShapeSparkline } from "@/ui/trading-terminal/PositionShapeSparkline";
 
 function LabelValueRow({
   label,
@@ -140,8 +142,8 @@ export function TradePanel({
             onClick={() => onSideChange("buy")}
             type="button"
           >
-            <span className="block font-semibold text-[#D1FAE5] text-sm">Long</span>
-            <span className="mt-0.5 block text-[#8CC9A3] text-[11px]">Long {baseAsset} convexity</span>
+            <span className="block font-semibold text-[#D1FAE5] text-sm">Long Convexity</span>
+            <span className="mt-0.5 block text-[#8CC9A3] text-[11px]">Long gamma. Benefits from larger moves.</span>
           </button>
           <button
             className={cn(
@@ -151,14 +153,14 @@ export function TradePanel({
             onClick={() => onSideChange("sell")}
             type="button"
           >
-            <span className="block font-semibold text-[#FDE2E2] text-sm">Short</span>
-            <span className="mt-0.5 block text-[#D59C9C] text-[11px]">Short {baseAsset} convexity</span>
+            <span className="block font-semibold text-[#FDE2E2] text-sm">Short Convexity</span>
+            <span className="mt-0.5 block text-[#D59C9C] text-[11px]">Short gamma. Benefits from realized stability.</span>
           </button>
         </div>
 
         <div className="space-y-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
           <LabelValueRow label="Contract" value={contractLabel} />
-          <LabelValueRow label="Available Convex Notional" value={`250,000 ${quoteAsset}`} />
+          <LabelValueRow label="Available Margin" value={`250,000 ${quoteAsset}`} />
           <LabelValueRow label="Settlement Wallet" value={settlementWallet} />
         </div>
 
@@ -214,26 +216,14 @@ export function TradePanel({
           </div>
         </div>
 
-        <div className="space-y-1.5 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
-          <div className="text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">Exposure Preview</div>
-          <LabelValueRow
-            label="Convex Notional"
-            value={`$${Math.round(exposureMetrics.convexNotionalUsd).toLocaleString("en-US")}`}
-          />
-          <LabelValueRow
-            label="Delta Equivalent"
-            value={`${exposureMetrics.deltaEquivalentBtc.toFixed(2)} ${baseAsset}`}
-          />
-          <LabelValueRow
-            label="Convexity Exposure"
-            tooltip="Approximate PnL sensitivity to a 1% squared move around the current mark."
-            value={`$${exposureMetrics.convexityExposurePer1PctSquared.toFixed(0)} / 1%²`}
-          />
-          <LabelValueRow
-            label="Gamma / $1k"
-            tooltip="Delta-equivalent change per $1,000 move in the underlying reference."
-            value={`${exposureMetrics.gammaPer1kMove.toFixed(3)} ${baseAsset}`}
-          />
+        <ConvexityExposureCard baseAsset={baseAsset} metrics={exposureMetrics} />
+
+        <div className="space-y-2 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
+          <div className="flex items-center justify-between">
+            <div className="text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">Position Shape</div>
+            <span className="text-[#9CA3AF] text-[10px] uppercase tracking-[0.14em]">P&amp;L vs BTC</span>
+          </div>
+          <PositionShapeSparkline metrics={exposureMetrics} />
         </div>
 
         <div className="space-y-1.5 text-[11px]">
@@ -291,15 +281,18 @@ export function TradePanel({
           <LabelValueRow label="Mark" value={exposureMetrics.markPrice.toFixed(2)} />
           <LabelValueRow label="Entry Reference" value={exposureMetrics.entryReferencePrice.toFixed(2)} />
           <LabelValueRow label="Settlement" value={quoteAsset} />
+          <LabelValueRow label="Delta Notional" value={`$${Math.round(exposureMetrics.deltaNotionalUsd).toLocaleString("en-US")}`} />
+          <LabelValueRow label="Break-even Move" value={`±${exposureMetrics.breakEvenMovePercent.toFixed(2)}%`} />
           <div className="flex items-center justify-between text-[11px]">
             <span className="inline-flex items-center gap-1 text-[#6B7280]">
-              Convexity Exposure
-              <span title="Convexity exposure is shown as approximate PnL per 1% squared move.">
+              Gamma
+              <span title="Displayed as delta change in BTC for a 1% move in BTC spot.">
                 <Info className="size-3" />
               </span>
             </span>
             <span className="font-medium text-[#D1D5DB]">
-              ${exposureMetrics.convexityExposurePer1PctSquared.toFixed(0)} / 1%²
+              {exposureMetrics.gammaPer1PctMove >= 0 ? "+" : "-"}
+              {Math.abs(exposureMetrics.gammaPer1PctMove).toFixed(3)} {baseAsset} / 1%
             </span>
           </div>
         </div>

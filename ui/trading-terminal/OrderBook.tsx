@@ -6,6 +6,7 @@ import type {
   TradePrint,
 } from "@/lib/trading.types";
 import { cn } from "@/lib/cn";
+import { ConvexityOrderbookToggle } from "@/ui/trading-terminal/ConvexityOrderbookToggle";
 
 function formatPrice(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -27,7 +28,7 @@ function formatDisplayValue(level: OrderBookLevel, mode: OrderBookDisplayMode) {
   }
 
   if (mode === "convex") {
-    return `${level.convexUnits?.toFixed(2) ?? "0.00"} cvx`;
+    return `${level.gammaPer1PctMove?.toFixed(3) ?? "0.000"} BTC`;
   }
 
   return formatPrice(level.price);
@@ -39,10 +40,22 @@ function getDisplayLabel(mode: OrderBookDisplayMode) {
   }
 
   if (mode === "convex") {
-    return "Convex";
+    return "Gamma / level";
   }
 
   return "Price";
+}
+
+function getDisplaySubheader(mode: OrderBookDisplayMode) {
+  if (mode === "convex") {
+    return "BTC per 1% move";
+  }
+
+  if (mode === "delta") {
+    return "BTC equivalent";
+  }
+
+  return "USDC";
 }
 
 function OrderRow({
@@ -153,32 +166,28 @@ export function OrderBook({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-[#1B2430] border-b bg-[#0D141D] px-2.5 py-1">
-        <div className="flex min-w-0 items-center gap-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-1">
-          {(["price", "delta", "convex"] as const).map((mode) => (
-            <button
-              className={cn(
-                "whitespace-nowrap rounded-sm px-2 py-1 text-[10px]",
-                displayMode === mode ? "bg-[#172554]/50 text-[#BFDBFE]" : "text-[#6B7280]",
-              )}
-              key={mode}
-              onClick={() => onDisplayModeChange(mode)}
-              type="button"
-            >
-              {getDisplayLabel(mode)}
-            </button>
-          ))}
-        </div>
-
+      <div className="flex flex-col gap-2 border-[#1B2430] border-b bg-[#0D141D] px-2.5 py-1.5">
         {nonlinearLadderLabel ? (
-          <span className="shrink-0 whitespace-nowrap rounded-full border border-[#1F3C55] bg-[#0E2233] px-2 py-0.5 text-[#93C5FD] text-[10px] leading-none">
-            {nonlinearLadderLabel}
-          </span>
+          <div className="flex justify-start">
+            <span className="shrink-0 whitespace-nowrap rounded-full border border-[#1F3C55] bg-[#0E2233] px-2 py-0.5 text-[#93C5FD] text-[10px] leading-none">
+              {nonlinearLadderLabel}
+            </span>
+          </div>
         ) : null}
+
+        <ConvexityOrderbookToggle
+          displayMode={displayMode}
+          onDisplayModeChange={onDisplayModeChange}
+        />
       </div>
 
       <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] border-[#1B2430] border-b px-2.5 py-1 text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">
-        <span>{getDisplayLabel(displayMode)}</span>
+        <div className="leading-tight">
+          <span>{getDisplayLabel(displayMode)}</span>
+          <div className="text-[#4B5563] text-[9px] normal-case tracking-[0.08em]">
+            {getDisplaySubheader(displayMode)}
+          </div>
+        </div>
         <span className="text-right">Depth</span>
         <span className="text-right">Cum</span>
       </div>
@@ -217,6 +226,12 @@ export function OrderBook({
                 </span>
                 <span className="text-right text-[#6B7280]">
                   Top size <span className="text-[#D1D5DB]">{riskModel.topLevelSizeFactor.toFixed(2)}x</span>
+                </span>
+                <span className="text-[#6B7280]">
+                  Gamma regime <span className="text-[#D1D5DB]">{riskModel.convexityRisk.toFixed(2)}</span>
+                </span>
+                <span className="text-right text-[#6B7280]">
+                  Ladder <span className="text-[#D1D5DB]">{displayMode === "price" ? "Price" : getDisplayLabel(displayMode)}</span>
                 </span>
               </div>
             ) : null}

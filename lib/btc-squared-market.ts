@@ -5,6 +5,8 @@ const BTC_SQUARED_PERP_ADDRESS = "0x0d5e36041064248445F8a8D5d0bBDc3b5c48fDA7";
 const GET_INDEX_PRICE_SELECTOR = "0x58c0994a";
 const GET_PERP_PRICE_SELECTOR = "0x90f76b18";
 const E18 = 1_000_000_000_000_000_000n;
+const EXPECTED_PERP_REVERT_PATTERNS = ["execution reverted", "getPerpPrice() failed"];
+let hasLoggedExpectedPerpFallback = false;
 
 export type BtcSquaredPerpSnapshot = {
   confidence: number;
@@ -76,6 +78,30 @@ function scale18ToNumber(value: bigint) {
   return Number(whole) + Number(fraction) / Number(E18);
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
+function isExpectedPerpReadFailure(error: unknown) {
+  const message = getErrorMessage(error).toLowerCase();
+  return EXPECTED_PERP_REVERT_PATTERNS.every((pattern) => message.includes(pattern.toLowerCase()));
+}
+
+function logExpectedPerpFallbackOnce(error: unknown) {
+  if (hasLoggedExpectedPerpFallback) {
+    return;
+  }
+
+  hasLoggedExpectedPerpFallback = true;
+  console.info("BTC convex perp mark unavailable from getPerpPrice(); using index fallback.", {
+    reason: getErrorMessage(error),
+  });
+}
+
 export async function getBtcSquaredPerpSnapshot(): Promise<BtcSquaredPerpSnapshot> {
   const [indexResult, perpResult] = await Promise.allSettled([
     callBaseRpc(GET_INDEX_PRICE_SELECTOR, "getIndexPrice()"),
@@ -87,7 +113,11 @@ export async function getBtcSquaredPerpSnapshot(): Promise<BtcSquaredPerpSnapsho
   }
 
   if (perpResult.status === "rejected") {
-    console.warn("BTC convex perp price read failed:", perpResult.reason);
+    if (indexResult.status === "fulfilled" && isExpectedPerpReadFailure(perpResult.reason)) {
+      logExpectedPerpFallbackOnce(perpResult.reason);
+    } else {
+      console.warn("BTC convex perp price read failed:", perpResult.reason);
+    }
   }
 
   if (indexResult.status === "rejected" && perpResult.status === "rejected") {
@@ -106,7 +136,8 @@ export async function getBtcSquaredPerpSnapshot(): Promise<BtcSquaredPerpSnapsho
 
   const indexSquaredUsd = scale18ToNumber(decodeUint256(readWord(resolvedIndexHex, 0)));
   const markSquaredUsd = scale18ToNumber(decodeUint256(readWord(resolvedMarkHex, 0)));
-  const confidence = Number(decodeUint256(readWord(resolvedMarkHex, 1))) / 1e18;
+  const confidence =
+    fallbackUsed ? 0 : Number(decodeUint256(readWord(resolvedMarkHex, 1))) / 1e18;
 
   return {
     confidence,

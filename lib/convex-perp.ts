@@ -31,6 +31,8 @@ function roundTo(value: number, digits: number) {
   return Math.round(value * factor) / factor;
 }
 
+const BREAK_EVEN_SEARCH_STEPS = [0.0025, 0.005, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2] as const;
+
 export function getNormalizedSquaredPayoff(markPrice: number, referencePrice: number) {
   return (markPrice / referencePrice) ** 2 - 1;
 }
@@ -64,12 +66,108 @@ export function getGammaPer1kMove(convexNotionalUsd: number, referencePrice: num
   return ((2 * convexNotionalUsd) / referencePrice ** 2) * 1000;
 }
 
+export function getGammaPer1PctMove(
+  convexNotionalUsd: number,
+  markPrice: number,
+  referencePrice: number,
+) {
+  return ((2 * convexNotionalUsd) / referencePrice ** 2) * (markPrice * 0.01);
+}
+
+export function getDeltaNotionalUsd(convexNotionalUsd: number, markPrice: number, referencePrice: number) {
+  return getDeltaEquivalentBtc(convexNotionalUsd, markPrice, referencePrice) * markPrice;
+}
+
 export function getConvexityExposurePer1PctSquared(
   convexNotionalUsd: number,
   markPrice: number,
   referencePrice: number,
 ) {
   return convexNotionalUsd * ((markPrice / referencePrice) ** 2) * 0.0001;
+}
+
+export function getEstimatedFundingUsd8h(
+  convexNotionalUsd: number,
+  side: "buy" | "sell",
+  fundingRateBps = 1,
+) {
+  const signedFunding = (convexNotionalUsd * fundingRateBps) / 10_000;
+  return side === "buy" ? -signedFunding : signedFunding;
+}
+
+function findBreakEvenMove(
+  getNetScenarioPnl: (movePercent: number) => number,
+  direction: -1 | 1,
+  currentNet: number,
+) {
+  let previousMove = 0;
+
+  for (const step of BREAK_EVEN_SEARCH_STEPS) {
+    const nextMove = step * direction;
+    const nextNet = getNetScenarioPnl(nextMove);
+
+    if (nextNet >= 0) {
+      let low = Math.min(previousMove, nextMove);
+      let high = Math.max(previousMove, nextMove);
+
+      for (let iteration = 0; iteration < 18; iteration += 1) {
+        const midpoint = (low + high) / 2;
+        const midpointNet = getNetScenarioPnl(midpoint);
+
+        if (midpointNet >= 0) {
+          high = midpoint;
+        } else {
+          low = midpoint;
+        }
+      }
+
+      return Math.abs(high);
+    }
+
+    previousMove = nextMove;
+  }
+
+  return currentNet > 0 ? 0 : Number.POSITIVE_INFINITY;
+}
+
+export function getBreakEvenMovePercent(
+  convexNotionalUsd: number,
+  entryReferencePrice: number,
+  markPrice: number,
+  side: "buy" | "sell",
+  estimatedFundingUsd8h: number,
+) {
+  if (convexNotionalUsd <= 0 || entryReferencePrice <= 0 || markPrice <= 0) {
+    return 0;
+  }
+
+  // This remains a terminal-friendly placeholder until real fee/funding/slippage pricing is wired in.
+  // We solve for the smallest absolute move from the current mark where net PnL turns non-negative
+  // after subtracting one funding interval from long-convexity orders or adding it to short-convexity orders.
+  function getNetScenarioPnl(movePercent: number) {
+    const scenarioMark = markPrice * (1 + movePercent);
+    return (
+      getConvexPnlUsd(convexNotionalUsd, entryReferencePrice, scenarioMark, side) +
+      estimatedFundingUsd8h
+    );
+  }
+
+  const currentNet = getNetScenarioPnl(0);
+
+  if (currentNet > 0) {
+    return 0;
+  }
+
+  const bestMove = Math.min(
+    findBreakEvenMove(getNetScenarioPnl, -1, currentNet),
+    findBreakEvenMove(getNetScenarioPnl, 1, currentNet),
+  );
+
+  if (!Number.isFinite(bestMove)) {
+    return 20;
+  }
+
+  return Math.max(roundTo(bestMove * 100, 2), 0.01);
 }
 
 export function getConvexPnlUsd(
@@ -82,6 +180,26 @@ export function getConvexPnlUsd(
     convexNotionalUsd * getNormalizedSquaredPayoff(markPrice, entryReferencePrice);
 
   return side === "buy" ? signedPayoff : -signedPayoff;
+}
+
+export function getConvexScenarioPnl(
+  convexNotionalUsd: number,
+  entryReferencePrice: number,
+  markPrice: number,
+  side: "buy" | "sell",
+  estimatedFundingUsd8h: number,
+) {
+  return [-0.05, 0, 0.05].map((move) => {
+    const scenarioMark = markPrice * (1 + move);
+
+    return {
+      changeLabel: move === 0 ? "BTC unchanged" : `BTC ${move > 0 ? "+" : ""}${Math.round(move * 100)}%`,
+      pnlUsd:
+        getConvexPnlUsd(convexNotionalUsd, entryReferencePrice, scenarioMark, side) +
+        estimatedFundingUsd8h,
+      spotPrice: roundTo(scenarioMark, 2),
+    };
+  });
 }
 
 export function buildConvexExposureMetrics({
@@ -98,8 +216,16 @@ export function buildConvexExposureMetrics({
     referencePrice,
     sizingMode,
   });
+  const estimatedFundingUsd8h = getEstimatedFundingUsd8h(convexNotionalUsd, side, 1);
 
   return {
+    breakEvenMovePercent: getBreakEvenMovePercent(
+      convexNotionalUsd,
+      entryReferencePrice,
+      markPrice,
+      side,
+      estimatedFundingUsd8h,
+    ),
     convexNotionalUsd,
     convexityExposurePer1PctSquared: getConvexityExposurePer1PctSquared(
       convexNotionalUsd,
@@ -107,11 +233,21 @@ export function buildConvexExposureMetrics({
       referencePrice,
     ),
     convexUnits: getConvexUnitsFromNotional(convexNotionalUsd, referencePrice),
+    deltaNotionalUsd: getDeltaNotionalUsd(convexNotionalUsd, markPrice, referencePrice),
     deltaEquivalentBtc: getDeltaEquivalentBtc(convexNotionalUsd, markPrice, referencePrice),
     entryReferencePrice,
+    estimatedFundingUsd8h,
+    gammaPer1PctMove: getGammaPer1PctMove(convexNotionalUsd, markPrice, referencePrice),
     gammaPer1kMove: getGammaPer1kMove(convexNotionalUsd, referencePrice),
     markPrice,
     pnlUsd: getConvexPnlUsd(convexNotionalUsd, entryReferencePrice, markPrice, side),
+    scenarioPnl: getConvexScenarioPnl(
+      convexNotionalUsd,
+      entryReferencePrice,
+      markPrice,
+      side,
+      estimatedFundingUsd8h,
+    ),
     side,
   };
 }
@@ -236,6 +372,10 @@ export function generateNonlinearConvexOrderBook({
         3,
       ),
       distanceBps: roundTo(askDistanceBps, 1),
+      gammaPer1PctMove: roundTo(
+        getGammaPer1PctMove(askSize * referencePrice, askPrice, referencePrice),
+        3,
+      ),
       price: askPrice,
       riskAdjustedSize: roundTo(askSize, 2),
       size: roundTo(askSize, 2),
@@ -249,6 +389,10 @@ export function generateNonlinearConvexOrderBook({
         3,
       ),
       distanceBps: roundTo(bidDistanceBps, 1),
+      gammaPer1PctMove: roundTo(
+        getGammaPer1PctMove(bidSize * referencePrice, bidPrice, referencePrice),
+        3,
+      ),
       price: bidPrice,
       riskAdjustedSize: roundTo(bidSize, 2),
       size: roundTo(bidSize, 2),

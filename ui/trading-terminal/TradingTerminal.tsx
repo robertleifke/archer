@@ -40,6 +40,7 @@ import { ChartPanel } from "@/ui/trading-terminal/ChartPanel";
 import { LiveTabTitle } from "@/ui/trading-terminal/LiveTabTitle";
 import { MarketHeader } from "@/ui/trading-terminal/MarketHeader";
 import { OrderBook } from "@/ui/trading-terminal/OrderBook";
+import { PositionShapeSparkline } from "@/ui/trading-terminal/PositionShapeSparkline";
 import { TradePanel } from "@/ui/trading-terminal/TradePanel";
 
 const DISPLAY_NUMBER_PATTERN = /-?\d+(\.\d+)?/;
@@ -83,28 +84,31 @@ function buildActivityViews(
 ) {
   return {
     "open-orders": {
-      columns: ["Instrument", "Bias", "Mode", "Convex Notional", "Entry Ref"],
+      columns: ["Instrument", "Bias", "Mode", "Delta Eq", "Entry Ref"],
       rows: [
         {
           cells: [
             ticker,
             "Long Convexity",
             "Notional",
-            `$${Math.round(orderPreviewMetrics.convexNotionalUsd).toLocaleString("en-US")}`,
+            `${orderPreviewMetrics.deltaEquivalentBtc.toFixed(2)} BTC`,
             orderPreviewMetrics.entryReferencePrice.toFixed(2),
           ],
         },
       ],
     },
     positions: {
-      columns: ["Instrument", "Entry Ref", "Convex Notional", "Delta Eq", "Mark", "PnL"],
+      columns: ["Instrument", "Entry Ref", "Delta Eq", "Gamma", "Mark", "PnL"],
       rows: [
         {
           cells: [
-            ticker,
+            <div className="flex items-center gap-2" key={`${ticker}-instrument`}>
+              <PositionShapeSparkline compact interactive metrics={positionMetrics} />
+              <span>{ticker}</span>
+            </div>,
             positionMetrics.entryReferencePrice.toFixed(2),
-            `$${Math.round(positionMetrics.convexNotionalUsd).toLocaleString("en-US")}`,
             `${positionMetrics.deltaEquivalentBtc.toFixed(2)} BTC`,
+            `${positionMetrics.gammaPer1PctMove.toFixed(3)} BTC / 1%`,
             positionMetrics.markPrice.toFixed(2),
             `${positionMetrics.pnlUsd >= 0 ? "+" : "-"}$${Math.abs(positionMetrics.pnlUsd).toFixed(0)}`,
           ],
@@ -129,7 +133,7 @@ function buildTradeStatus(
 ) {
   const action = side === "buy" ? "Long" : "Short";
 
-  return `${action} convexity ${Math.round(exposureMetrics.convexNotionalUsd).toLocaleString("en-US")} USDC notional, ${exposureMetrics.deltaEquivalentBtc.toFixed(2)} BTC delta eq on ${ticker}`;
+  return `${action} convexity ${exposureMetrics.deltaEquivalentBtc.toFixed(2)} BTC delta eq, gamma ${exposureMetrics.gammaPer1PctMove.toFixed(3)} BTC per 1% on ${ticker}`;
 }
 
 function getIndexDigits(_symbol: string) {
@@ -289,9 +293,10 @@ function getDeliveryValue(positionOverview: DeliveryTerm[], label: string) {
 function buildPositionOverview(positionMetrics: ConvexExposureMetrics) {
   return [
     { label: "Entry Reference", value: positionMetrics.entryReferencePrice.toFixed(2) },
-    { label: "Convex Notional", value: `$${Math.round(positionMetrics.convexNotionalUsd).toLocaleString("en-US")}` },
+    { label: "Delta Notional", value: `$${Math.round(positionMetrics.deltaNotionalUsd).toLocaleString("en-US")}` },
     { label: "Delta Equivalent", value: `${positionMetrics.deltaEquivalentBtc.toFixed(2)} BTC` },
-    { label: "Convexity Exposure", value: `$${positionMetrics.convexityExposurePer1PctSquared.toFixed(0)} / 1%²` },
+    { label: "Gamma", value: `${positionMetrics.gammaPer1PctMove.toFixed(3)} BTC / 1%` },
+    { label: "Break-even Move", value: `±${positionMetrics.breakEvenMovePercent.toFixed(2)}%` },
     { label: "Mark Price", value: positionMetrics.markPrice.toFixed(2) },
     { label: "Unrealized PnL", value: `${positionMetrics.pnlUsd >= 0 ? "+" : "-"}$${Math.abs(positionMetrics.pnlUsd).toFixed(0)}` },
   ] satisfies DeliveryTerm[];
@@ -702,8 +707,10 @@ export function TradingTerminal({
             <ChartPanel
               candles={liveCandles}
               chartContext={chartContext}
+              exposureMetrics={currentPositionMetrics}
               expandedChart={expandedChart}
               indicatorsEnabled={indicatorsEnabled}
+              riskModel={displayOrderBook.riskModel}
               selectedRange={selectedRange}
               selectedTimeframe={timeframe}
               selectedTool={selectedTool}

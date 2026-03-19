@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 export type MarketStat = {
   label: string;
   tone?: "accent" | "negative" | "positive" | "neutral";
@@ -17,6 +19,7 @@ export type OrderBookLevel = {
   convexUnits?: number;
   deltaEquivalent?: number;
   distanceBps?: number;
+  gammaPer1PctMove?: number;
   price: number;
   riskAdjustedSize?: number;
   size: number;
@@ -27,15 +30,26 @@ export type OrderBookDisplayMode = "convex" | "delta" | "price";
 
 export type ConvexSizingMode = "convex" | "delta" | "notional";
 
+export type ConvexScenario = {
+  changeLabel: string;
+  pnlUsd: number;
+  spotPrice: number;
+};
+
 export type ConvexExposureMetrics = {
+  breakEvenMovePercent: number;
   convexNotionalUsd: number;
   convexityExposurePer1PctSquared: number;
   convexUnits: number;
+  deltaNotionalUsd: number;
   deltaEquivalentBtc: number;
   entryReferencePrice: number;
+  estimatedFundingUsd8h: number;
+  gammaPer1PctMove: number;
   gammaPer1kMove: number;
   markPrice: number;
   pnlUsd: number;
+  scenarioPnl: ConvexScenario[];
   side: "buy" | "sell";
 };
 
@@ -111,7 +125,7 @@ export type ContractMarket = {
 };
 
 export type ActivityRow = {
-  cells: string[];
+  cells: ReactNode[];
   positiveCellIndexes?: number[];
 };
 
