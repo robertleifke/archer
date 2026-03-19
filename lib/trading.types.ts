@@ -93,6 +93,16 @@ export type BtcSquaredPerpSnapshot = {
   pair: "BTCUSDC-SQPERP";
 };
 
+export type MatchingBackendOrderBookSnapshot = {
+  asks: OrderBookLevel[];
+  assetAddress: string;
+  bids: OrderBookLevel[];
+  market: string;
+  source: "matching-backend";
+  subId: string;
+  updatedAt: string;
+};
+
 export type NgnPerpSnapshot = {
   confidence: number;
   contractAddress: string;

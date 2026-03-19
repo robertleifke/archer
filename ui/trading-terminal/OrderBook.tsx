@@ -64,8 +64,13 @@ export function OrderBook({
   view: "Order Book" | "Trades";
   onViewChange: (view: "Order Book" | "Trades") => void;
 }) {
-  const askMax = Math.max(...asks.map((level) => level.total));
-  const bidMax = Math.max(...bids.map((level) => level.total));
+  const askMax = Math.max(1, ...asks.map((level) => level.total));
+  const bidMax = Math.max(1, ...bids.map((level) => level.total));
+  const bestAsk = asks[0];
+  const bestBid = bids[0];
+  const spread = bestAsk && bestBid ? bestAsk.price - bestBid.price : null;
+  const spreadPercent =
+    spread !== null && bestBid && bestBid.price > 0 ? (spread / bestBid.price) * 100 : null;
 
   return (
     <section className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-md border border-[#1B2430] bg-[#0F1720] xl:min-h-0">
@@ -121,8 +126,10 @@ export function OrderBook({
             <div className="flex items-center justify-between">
               <span className="font-medium text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">Spread</span>
               <div className="flex items-center gap-2 text-[11px]">
-                <span className="font-semibold text-[#E5E7EB]">0.10</span>
-                <span className="text-[#60A5FA]">0.006%</span>
+                <span className="font-semibold text-[#E5E7EB]">{spread === null ? "N/A" : formatPrice(spread)}</span>
+                <span className="text-[#60A5FA]">
+                  {spreadPercent === null ? "Waiting" : `${spreadPercent.toFixed(3)}%`}
+                </span>
               </div>
             </div>
           </div>
@@ -132,6 +139,12 @@ export function OrderBook({
               <OrderRow key={level.price} level={level} maxTotal={bidMax} side="bid" />
             ))}
           </div>
+
+          {asks.length === 0 && bids.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center px-4 py-6 text-center text-[#6B7280] text-xs">
+              No resting orders on this book yet.
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">

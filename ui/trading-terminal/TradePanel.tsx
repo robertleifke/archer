@@ -8,7 +8,7 @@ function LabelValueRow({ label, value }: { label: string; value: string }) {
       <span className="min-w-0 text-[#6B7280]">{label}</span>
       <span
         className={cn(
-          "min-w-0 text-right font-medium text-[#D1D5DB] leading-snug wrap-break-word",
+          "wrap-break-word min-w-0 text-right font-medium text-[#D1D5DB] leading-snug",
           value.startsWith("+$") && "text-[#8CC9A3]",
         )}
       >
@@ -23,6 +23,7 @@ export function TradePanel({
   allocation,
   contractDetails,
   contractLabel,
+  executionMode,
   markPrice,
   lastAction,
   orderType,
@@ -31,6 +32,8 @@ export function TradePanel({
   postOnly,
   settlementWallet,
   size,
+  submissionEnabled,
+  submissionNotice,
   tradeSide,
   onAllocationChange,
   onOrderTypeChange,
@@ -42,6 +45,7 @@ export function TradePanel({
   allocation: number;
   contractDetails: DeliveryTerm[];
   contractLabel: string;
+  executionMode: "disabled" | "ready";
   markPrice: string;
   lastAction: string;
   orderType: "Limit" | "Market" | "Stop";
@@ -50,6 +54,8 @@ export function TradePanel({
   quoteAsset: string;
   settlementWallet: string;
   size: string;
+  submissionEnabled: boolean;
+  submissionNotice: string;
   tradeSide: "buy" | "sell";
   onAllocationChange: (value: number) => void;
   onOrderTypeChange: (type: "Limit" | "Market" | "Stop") => void;
@@ -162,6 +168,30 @@ export function TradePanel({
 
         <div className="rounded-sm border border-[#1B2430] bg-[#11161D] px-2 py-1.5 text-[#9CA3AF] text-[11px]">
           {lastAction}
+        </div>
+
+        <div className="space-y-2 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em]">
+            <span className="text-[#6B7280]">Execution</span>
+            <span className={cn("font-medium", executionMode === "ready" ? "text-[#8CC9A3]" : "text-[#FBBF24]")}>
+              {executionMode === "ready" ? "Ready" : "Read Only"}
+            </span>
+          </div>
+
+          <p className="text-[#9CA3AF] text-[11px] leading-relaxed">{submissionNotice}</p>
+
+          <button
+            className={cn(
+              "w-full rounded-sm px-3 py-2 font-semibold text-sm transition-colors",
+              tradeSide === "buy" && submissionEnabled && "bg-[#123524] text-[#D1FAE5]",
+              tradeSide === "sell" && submissionEnabled && "bg-[#4D1717] text-[#FDE2E2]",
+              !submissionEnabled && "cursor-not-allowed bg-[#151B23] text-[#6B7280]",
+            )}
+            disabled={!submissionEnabled}
+            type="button"
+          >
+            {submissionEnabled ? `${tradeSide === "buy" ? "Place Long" : "Place Short"} Order` : "Wallet Signing Required"}
+          </button>
         </div>
 
         <div className="space-y-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">

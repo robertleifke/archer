@@ -3,7 +3,14 @@
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import type { CHART_CONTEXT_TABS, CHART_RANGE_BUTTONS, TIMEFRAME_OPTIONS } from "@/lib/mock-trading-data";
 import type { CONTRACT_LABELS } from "@/lib/mock-trading-data";
-import type { BtcSquaredPerpSnapshot, Candle, DeliveryTerm, MarketStat, NgnPerpSnapshot } from "@/lib/trading.types";
+import type {
+  BtcSquaredPerpSnapshot,
+  Candle,
+  DeliveryTerm,
+  MarketStat,
+  MatchingBackendOrderBookSnapshot,
+  NgnPerpSnapshot,
+} from "@/lib/trading.types";
 import {
   ACTIVITY_VIEWS,
   CHART_TOOLS,
@@ -241,9 +248,11 @@ const BTC_MARKET_POLL_INTERVAL_MS = 5000;
 const NGN_MARKET_POLL_INTERVAL_MS = 30_000;
 
 export function TradingTerminal({
+  initialBtcOrderBook,
   initialBtcSnapshot,
   initialNgnSnapshot,
 }: {
+  initialBtcOrderBook: MatchingBackendOrderBookSnapshot | null;
   initialBtcSnapshot: BtcSquaredPerpSnapshot | null;
   initialNgnSnapshot: NgnPerpSnapshot | null;
 }) {
@@ -269,6 +278,7 @@ export function TradingTerminal({
   const [selectedBottomTab, setSelectedBottomTab] =
     useState<keyof typeof ACTIVITY_VIEWS>(DEFAULT_BOTTOM_TAB);
   const [filter, setFilter] = useState<(typeof FILTER_OPTIONS)[number]>(DEFAULT_FILTER);
+  const [btcOrderBook, setBtcOrderBook] = useState<MatchingBackendOrderBookSnapshot | null>(initialBtcOrderBook);
   const [btcSnapshot, setBtcSnapshot] = useState<BtcSquaredPerpSnapshot | null>(initialBtcSnapshot);
   const [ngnSnapshot, setNgnSnapshot] = useState<NgnPerpSnapshot | null>(initialNgnSnapshot);
 
@@ -277,6 +287,8 @@ export function TradingTerminal({
     MARKET_OPTIONS[0];
   const market = INSTRUMENT_MARKETS[selectedSymbol][selectedContract];
   const displayTicker = selectedMarket.symbol;
+  const isBtcSquaredMarket = selectedMarketId === "btc-usd-futures";
+  const liveBtcOrderBook = isBtcSquaredMarket && btcOrderBook !== null;
   const liveBtcMarket = selectedSymbol === "BTC/USD" && btcSnapshot !== null;
   const liveNgnMarket = selectedSymbol === "NGN/USD" && ngnSnapshot !== null;
   const lastAction = buildTradeStatus(tradeSide, size, selectedSymbol, displayTicker);
@@ -336,6 +348,12 @@ export function TradingTerminal({
     liveIndex,
   );
   const [liveCandles, setLiveCandles] = useState<Candle[]>(displayCandles);
+  const displayOrderBookAsks = liveBtcOrderBook ? btcOrderBook.asks : market.orderBookAsks;
+  const displayOrderBookBids = liveBtcOrderBook ? btcOrderBook.bids : market.orderBookBids;
+  const tradeSubmissionEnabled = false;
+  const tradeSubmissionNotice = isBtcSquaredMarket
+    ? "Live Square perp depth is coming from matching-backend. Order entry stays read only until Archer has wallet signing for the backend action payload."
+    : "Order entry is still using static terminal data for this market.";
 
   const refreshBtcSquaredMarket = useEffectEvent(async function refreshBtcSquaredMarket() {
     try {
@@ -348,6 +366,22 @@ export function TradingTerminal({
       }
 
       setBtcSnapshot((await response.json()) as BtcSquaredPerpSnapshot);
+    } catch {
+      // Keep the last good snapshot and let the rest of the UI continue rendering.
+    }
+  });
+
+  const refreshBtcSquaredOrderBook = useEffectEvent(async function refreshBtcSquaredOrderBook() {
+    try {
+      const response = await fetch("/api/markets/btcusdc-sqperp/book", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      setBtcOrderBook((await response.json()) as MatchingBackendOrderBookSnapshot);
     } catch {
       // Keep the last good snapshot and let the rest of the UI continue rendering.
     }
@@ -405,9 +439,11 @@ export function TradingTerminal({
     }
 
     void refreshBtcSquaredMarket();
+    void refreshBtcSquaredOrderBook();
 
     const intervalId = window.setInterval(() => {
       void refreshBtcSquaredMarket();
+      void refreshBtcSquaredOrderBook();
     }, BTC_MARKET_POLL_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
@@ -491,8 +527,8 @@ export function TradingTerminal({
 
           <div className="min-h-[420px] xl:min-h-0 xl:overflow-hidden">
             <OrderBook
-              asks={market.orderBookAsks}
-              bids={market.orderBookBids}
+              asks={displayOrderBookAsks}
+              bids={displayOrderBookBids}
               contractLabel={selectedContract}
               trades={market.trades}
               view={orderBookView}
@@ -506,6 +542,7 @@ export function TradingTerminal({
               allocation={allocation}
               contractDetails={market.contractDetails}
               contractLabel={displayTicker}
+              executionMode={tradeSubmissionEnabled ? "ready" : "disabled"}
               markPrice={formatPrice(liveMark, getPricePrecision(selectedSymbol))}
               lastAction={lastAction}
               orderType={orderType}
@@ -514,6 +551,8 @@ export function TradingTerminal({
               quoteAsset="USDC"
               settlementWallet="USDC Margin"
               size={size}
+              submissionEnabled={tradeSubmissionEnabled}
+              submissionNotice={tradeSubmissionNotice}
               tradeSide={tradeSide}
               onAllocationChange={setAllocation}
               onOrderTypeChange={setOrderType}
