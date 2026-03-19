@@ -1,11 +1,30 @@
 import { ChevronDown, Info } from "lucide-react";
-import type { DeliveryTerm } from "@/lib/trading.types";
+import type {
+  ConvexExposureMetrics,
+  ConvexSizingMode,
+  DeliveryTerm,
+} from "@/lib/trading.types";
 import { cn } from "@/lib/cn";
 
-function LabelValueRow({ label, value }: { label: string; value: string }) {
+function LabelValueRow({
+  label,
+  tooltip,
+  value,
+}: {
+  label: string;
+  tooltip?: string;
+  value: string;
+}) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-start gap-x-3 text-[11px]">
-      <span className="min-w-0 text-[#6B7280]">{label}</span>
+      <span className="flex min-w-0 items-center gap-1 text-[#6B7280]">
+        {label}
+        {tooltip ? (
+          <span title={tooltip}>
+            <Info className="size-3" />
+          </span>
+        ) : null}
+      </span>
       <span
         className={cn(
           "wrap-break-word min-w-0 text-right font-medium text-[#D1D5DB] leading-snug",
@@ -18,35 +37,62 @@ function LabelValueRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function getSizingModeLabel(mode: ConvexSizingMode) {
+  if (mode === "convex") {
+    return "Convex";
+  }
+
+  if (mode === "delta") {
+    return "Delta Eq";
+  }
+
+  return "Notional";
+}
+
+function getInputSuffix(baseAsset: string, mode: ConvexSizingMode) {
+  if (mode === "convex") {
+    return "cvx";
+  }
+
+  if (mode === "delta") {
+    return baseAsset;
+  }
+
+  return "USDC";
+}
+
 export function TradePanel({
-  baseAsset,
   allocation,
+  baseAsset,
   contractDetails,
   contractLabel,
   executionMode,
-  markPrice,
+  exposureMetrics,
   lastAction,
   orderType,
   positionOverview,
-  quoteAsset,
   postOnly,
+  quoteAsset,
   settlementWallet,
   size,
+  sizingMode,
   submissionEnabled,
   submissionNotice,
+  supportedSizingModes,
   tradeSide,
   onAllocationChange,
   onOrderTypeChange,
   onPostOnlyToggle,
   onSideChange,
   onSizeChange,
+  onSizingModeChange,
 }: {
-  baseAsset: string;
   allocation: number;
+  baseAsset: string;
   contractDetails: DeliveryTerm[];
   contractLabel: string;
   executionMode: "disabled" | "ready";
-  markPrice: string;
+  exposureMetrics: ConvexExposureMetrics;
   lastAction: string;
   orderType: "Limit" | "Market" | "Stop";
   positionOverview: DeliveryTerm[];
@@ -54,14 +100,17 @@ export function TradePanel({
   quoteAsset: string;
   settlementWallet: string;
   size: string;
+  sizingMode: ConvexSizingMode;
   submissionEnabled: boolean;
   submissionNotice: string;
+  supportedSizingModes: ConvexSizingMode[];
   tradeSide: "buy" | "sell";
   onAllocationChange: (value: number) => void;
   onOrderTypeChange: (type: "Limit" | "Market" | "Stop") => void;
   onPostOnlyToggle: () => void;
   onSideChange: (side: "buy" | "sell") => void;
   onSizeChange: (value: string) => void;
+  onSizingModeChange: (mode: ConvexSizingMode) => void;
 }) {
   return (
     <section className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-md border border-[#1B2430] bg-[#0F1720] xl:min-h-0">
@@ -92,9 +141,7 @@ export function TradePanel({
             type="button"
           >
             <span className="block font-semibold text-[#D1FAE5] text-sm">Long</span>
-            <span className="mt-0.5 block text-[#8CC9A3] text-[11px]">
-              Long {baseAsset} / Short {quoteAsset}
-            </span>
+            <span className="mt-0.5 block text-[#8CC9A3] text-[11px]">Long {baseAsset} convexity</span>
           </button>
           <button
             className={cn(
@@ -105,21 +152,35 @@ export function TradePanel({
             type="button"
           >
             <span className="block font-semibold text-[#FDE2E2] text-sm">Short</span>
-            <span className="mt-0.5 block text-[#D59C9C] text-[11px]">
-              Short {baseAsset} / Long {quoteAsset}
-            </span>
+            <span className="mt-0.5 block text-[#D59C9C] text-[11px]">Short {baseAsset} convexity</span>
           </button>
         </div>
 
         <div className="space-y-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
           <LabelValueRow label="Contract" value={contractLabel} />
-          <LabelValueRow label="Available to Deliver" value={`250,000 ${quoteAsset}`} />
+          <LabelValueRow label="Available Convex Notional" value={`250,000 ${quoteAsset}`} />
           <LabelValueRow label="Settlement Wallet" value={settlementWallet} />
         </div>
 
         <div className="space-y-1.5">
+          <div className="grid grid-cols-3 gap-1 rounded-sm bg-[#11161D] p-1">
+            {supportedSizingModes.map((mode) => (
+              <button
+                className={cn(
+                  "whitespace-nowrap rounded-sm px-2 py-1.5 font-medium text-[11px] transition-colors",
+                  sizingMode === mode ? "bg-[#172554]/50 text-[#BFDBFE]" : "text-[#6B7280]",
+                )}
+                key={mode}
+                onClick={() => onSizingModeChange(mode)}
+                type="button"
+              >
+                {getSizingModeLabel(mode)}
+              </button>
+            ))}
+          </div>
+
           <label className="text-[#6B7280] text-[10px] uppercase tracking-[0.14em]" htmlFor="trade-size">
-            Size
+            Order Input
           </label>
           <div className="flex items-center overflow-hidden rounded-sm border border-[#1B2430] bg-[#11161D]">
             <input
@@ -133,7 +194,7 @@ export function TradePanel({
               className="flex h-10 items-center gap-1 border-[#1B2430] border-l px-3 text-[#D1D5DB] text-sm"
               type="button"
             >
-              {baseAsset}
+              {getInputSuffix(baseAsset, sizingMode)}
               <ChevronDown className="size-4 text-[#6B7280]" />
             </button>
           </div>
@@ -151,6 +212,28 @@ export function TradePanel({
               {allocation} %
             </div>
           </div>
+        </div>
+
+        <div className="space-y-1.5 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
+          <div className="text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">Exposure Preview</div>
+          <LabelValueRow
+            label="Convex Notional"
+            value={`$${Math.round(exposureMetrics.convexNotionalUsd).toLocaleString("en-US")}`}
+          />
+          <LabelValueRow
+            label="Delta Equivalent"
+            value={`${exposureMetrics.deltaEquivalentBtc.toFixed(2)} ${baseAsset}`}
+          />
+          <LabelValueRow
+            label="Convexity Exposure"
+            tooltip="Approximate PnL sensitivity to a 1% squared move around the current mark."
+            value={`$${exposureMetrics.convexityExposurePer1PctSquared.toFixed(0)} / 1%²`}
+          />
+          <LabelValueRow
+            label="Gamma / $1k"
+            tooltip="Delta-equivalent change per $1,000 move in the underlying reference."
+            value={`${exposureMetrics.gammaPer1kMove.toFixed(3)} ${baseAsset}`}
+          />
         </div>
 
         <div className="space-y-1.5 text-[11px]">
@@ -190,7 +273,9 @@ export function TradePanel({
             disabled={!submissionEnabled}
             type="button"
           >
-            {submissionEnabled ? `${tradeSide === "buy" ? "Place Long" : "Place Short"} Order` : "Wallet Signing Required"}
+            {submissionEnabled
+              ? `${tradeSide === "buy" ? "Long" : "Short"} Convexity`
+              : "Wallet Signing Required"}
           </button>
         </div>
 
@@ -203,15 +288,19 @@ export function TradePanel({
 
         <div className="space-y-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
           <div className="text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">Order Economics</div>
-          <LabelValueRow label="Order Value" value={`~${quoteAsset} ${markPrice}`} />
-          <LabelValueRow label="Initial Margin" value="$4,012" />
-          <LabelValueRow label="Fees" value="0.0200% / 0.0100%" />
+          <LabelValueRow label="Mark" value={exposureMetrics.markPrice.toFixed(2)} />
+          <LabelValueRow label="Entry Reference" value={exposureMetrics.entryReferencePrice.toFixed(2)} />
+          <LabelValueRow label="Settlement" value={quoteAsset} />
           <div className="flex items-center justify-between text-[11px]">
             <span className="inline-flex items-center gap-1 text-[#6B7280]">
-              Slippage
-              <Info className="size-3" />
+              Convexity Exposure
+              <span title="Convexity exposure is shown as approximate PnL per 1% squared move.">
+                <Info className="size-3" />
+              </span>
             </span>
-            <span className="font-medium text-[#D1D5DB]">Est: 0.01% / Max: 0.25%</span>
+            <span className="font-medium text-[#D1D5DB]">
+              ${exposureMetrics.convexityExposurePer1PctSquared.toFixed(0)} / 1%²
+            </span>
           </div>
         </div>
 

@@ -13,6 +13,11 @@ import {
   Type,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import {
+  buildConvexExposureMetrics,
+  buildConvexRiskModel,
+  generateNonlinearConvexOrderBook,
+} from "@/lib/convex-perp";
 import type {
   ActivityTab,
   ActivityView,
@@ -84,26 +89,6 @@ const BASE_ETH_CANDLES = [
   [4198, 4220, 4188, 4210, 231],
   [4210, 4228, 4198, 4205, 229],
   [4205, 4224, 4192, 4214, 235],
-] as const;
-
-const BASE_BTC_ASKS = [
-  { price: 84_280, size: 3, total: 81 },
-  { price: 84_290, size: 4, total: 78 },
-  { price: 84_300, size: 5, total: 74 },
-  { price: 84_310, size: 6, total: 69 },
-  { price: 84_320, size: 7, total: 63 },
-  { price: 84_330, size: 8, total: 56 },
-  { price: 84_340, size: 9, total: 48 },
-] as const;
-
-const BASE_BTC_BIDS = [
-  { price: 84_250, size: 10, total: 10 },
-  { price: 84_240, size: 9, total: 19 },
-  { price: 84_230, size: 8, total: 27 },
-  { price: 84_220, size: 7, total: 34 },
-  { price: 84_210, size: 6, total: 40 },
-  { price: 84_200, size: 5, total: 45 },
-  { price: 84_190, size: 4, total: 49 },
 ] as const;
 
 const BASE_ETH_ASKS = [
@@ -240,6 +225,17 @@ const NGN_CONTRACT_META = {
 
 export const CONTRACT_LABELS = ["PERP"] as const;
 
+const BTC_CONVEX_POSITION_NOTIONAL_USD = 182_500;
+const BTC_CONVEX_ORDER_NOTIONAL_USD = 64_000;
+const BTC_CONVEX_RISK_INPUT = {
+  baseTopLevelSize: 0.85,
+  convexityRisk: 0.78,
+  fundingRateBps: 1,
+  inventorySkew: 0.32,
+  levels: 7,
+  realizedVol: 0.038,
+} as const;
+
 export const CONTRACT_TABS = CONTRACT_LABELS.map((label) => ({
   active: label === "PERP",
   label,
@@ -277,14 +273,6 @@ export const MARKET_OPTIONS = [
     symbol: "NGNUSDC-PERP",
   },
 ] satisfies MarketOption[];
-
-function getPositionSize(_label: keyof typeof BTC_CONTRACT_META) {
-  return "+5.00 BTC";
-}
-
-function getUnrealizedPnl(_label: keyof typeof BTC_CONTRACT_META) {
-  return "+$3,150";
-}
 
 function parseNumber(value: string) {
   return Number(value.replaceAll(",", "").replaceAll("$", "").replaceAll("+", ""));
@@ -361,28 +349,44 @@ function buildBtcContractMarket(
   symbol: "BTC/USD",
   label: keyof typeof BTC_CONTRACT_META,
   offset: number,
-  sizeMultiplier: number,
+  _sizeMultiplier: number,
 ) {
   const meta = BTC_CONTRACT_META[label];
   const contractSymbol = FUTURES_DISPLAY_SYMBOL[symbol];
+  const markPrice = parseNumber(meta.mark);
+  const referencePrice = parseNumber(meta.index);
+  const convexPosition = buildConvexExposureMetrics({
+    entryReferencePrice: markPrice - 630,
+    inputValue: BTC_CONVEX_POSITION_NOTIONAL_USD,
+    markPrice,
+    referencePrice,
+    side: "buy",
+    sizingMode: "notional",
+  });
+  const convexBook = generateNonlinearConvexOrderBook({
+    ...BTC_CONVEX_RISK_INPUT,
+    midPrice: markPrice + offset,
+    referencePrice,
+  });
 
   return {
     basis: meta.basis,
     candles: buildCandles(BASE_BTC_CANDLES, offset, 0),
     contractDetails: [
       { label: "Contract", value: contractSymbol },
-      { label: "Contract Size", value: "1 BTC" },
-      { label: "Tick Size", value: "$5.00" },
-      { label: "Tick Value", value: "$5.00 / tick" },
+      { label: "Contract Type", value: "Normalized Convex Perpetual" },
+      { label: "Sizing", value: "Notional / Convex Units / Delta Equivalent" },
+      { label: "Reference", value: "Normalized to BTC index squared" },
       { label: "Settlement", value: "Cash-settled in USDC collateral" },
       { label: "Funding Rate", value: "+0.0100% / 8h" },
-      { label: "Long receives", value: "BTC exposure" },
-      { label: "Short receives", value: "USDC collateral" },
+      { label: "Long receives", value: "Long BTC convexity" },
+      { label: "Short receives", value: "Short BTC convexity" },
     ],
     id: label,
     index: meta.index,
     infoBar: [
       { label: "Contract Type", value: "Convex Perpetual" },
+      { label: "Ladder", value: "Nonlinear" },
       { label: "Settlement", value: "USDC" },
       { label: "Mark Price", value: meta.mark },
       { label: "24h Change", tone: "accent", value: "+2.84%" },
@@ -394,13 +398,22 @@ function buildBtcContractMarket(
       { label: "Price Limits", value: "79,971.00 - 88,389.00" },
     ],
     mark: meta.mark,
-    orderBookAsks: buildBook(BASE_BTC_ASKS, offset, sizeMultiplier, 2),
-    orderBookBids: buildBook(BASE_BTC_BIDS, offset, sizeMultiplier, 2),
+    orderBookAsks: convexBook.asks,
+    orderBookBids: convexBook.bids,
+    presentation: {
+      displayMode: "price",
+      nonlinearLadderLabel: "Nonlinear Ladder",
+      riskModel: convexBook.riskModel,
+      sizingModes: ["notional", "convex", "delta"],
+      variant: "convex",
+    },
     positionOverview: [
-      { label: "Position (BTC)", value: getPositionSize(label) },
-      { label: "Entry Price", value: Number(parseNumber(meta.mark) - 630).toFixed(2) },
-      { label: "Mark Price", value: Number(parseNumber(meta.mark)).toFixed(2) },
-      { label: "Unrealized PnL", value: getUnrealizedPnl(label) },
+      { label: "Entry Reference", value: convexPosition.entryReferencePrice.toFixed(2) },
+      { label: "Convex Notional", value: `$${Math.round(convexPosition.convexNotionalUsd).toLocaleString("en-US")}` },
+      { label: "Delta Equivalent", value: `${convexPosition.deltaEquivalentBtc.toFixed(2)} BTC` },
+      { label: "Convexity Exposure", value: `$${convexPosition.convexityExposurePer1PctSquared.toFixed(0)} / 1%²` },
+      { label: "Mark Price", value: markPrice.toFixed(2) },
+      { label: "Unrealized PnL", value: `${convexPosition.pnlUsd >= 0 ? "+" : "-"}$${Math.abs(convexPosition.pnlUsd).toFixed(0)}` },
     ],
     ticker: contractSymbol,
     timeToExpiry: "Perpetual",
@@ -447,9 +460,22 @@ function buildEthContractMarket(
     mark: meta.mark,
     orderBookAsks: buildBook(BASE_ETH_ASKS, offset, sizeMultiplier, 2),
     orderBookBids: buildBook(BASE_ETH_BIDS, offset, sizeMultiplier, 2),
+    presentation: {
+      displayMode: "price",
+      riskModel: buildConvexRiskModel({
+        convexityRisk: 0.42,
+        fundingRateBps: 1.25,
+        inventorySkew: -0.08,
+        realizedVol: 0.022,
+      }),
+      sizingModes: ["notional", "convex", "delta"],
+      variant: "convex",
+    },
     positionOverview: [
-      { label: "Position (ETH)", value: "+30 ETH" },
-      { label: "Entry Price", value: Number(parseNumber(meta.mark) - 26).toFixed(2) },
+      { label: "Entry Reference", value: Number(parseNumber(meta.mark) - 26).toFixed(2) },
+      { label: "Convex Notional", value: "$82,000" },
+      { label: "Delta Equivalent", value: "1.95 ETH" },
+      { label: "Convexity Exposure", value: "$8 / 1%²" },
       { label: "Mark Price", value: Number(parseNumber(meta.mark)).toFixed(2) },
       { label: "Unrealized PnL", value: "+$1,125" },
     ],
@@ -498,9 +524,22 @@ function buildNgnContractMarket(
     mark: meta.mark,
     orderBookAsks: buildBook(BASE_NGN_ASKS, offset, sizeMultiplier, 2),
     orderBookBids: buildBook(BASE_NGN_BIDS, offset, sizeMultiplier, 2),
+    presentation: {
+      displayMode: "price",
+      riskModel: buildConvexRiskModel({
+        convexityRisk: 0.17,
+        fundingRateBps: 0.6,
+        inventorySkew: 0.04,
+        realizedVol: 0.014,
+      }),
+      sizingModes: ["notional", "convex", "delta"],
+      variant: "convex",
+    },
     positionOverview: [
-      { label: "Position (NGN)", value: "+250,000 NGN" },
-      { label: "Entry Price", value: Number(parseNumber(meta.mark) - 7.8).toFixed(2) },
+      { label: "Entry Reference", value: Number(parseNumber(meta.mark) - 7.8).toFixed(2) },
+      { label: "Convex Notional", value: "$34,500" },
+      { label: "Delta Equivalent", value: "44,200 NGN eq" },
+      { label: "Convexity Exposure", value: "$3 / 1%²" },
       { label: "Mark Price", value: Number(parseNumber(meta.mark)).toFixed(2) },
       { label: "Unrealized PnL", value: "+$412" },
     ],
@@ -550,18 +589,28 @@ export const BOTTOM_TABS = [
 
 export const ACTIVITY_VIEWS = {
   "open-orders": {
-    columns: ["Instrument", "Side", "Type", "Size", "Price"],
-    rows: [{ cells: ["BTCUSDC-CVXPERP", "Buy BTC", "Limit", "1.50", "84,180.00"] }],
+    columns: ["Instrument", "Bias", "Mode", "Convex Notional", "Entry Ref"],
+    rows: [
+      {
+        cells: [
+          "BTCUSDC-CVXPERP",
+          "Long Convexity",
+          "Notional",
+          `$${BTC_CONVEX_ORDER_NOTIONAL_USD.toLocaleString("en-US")}`,
+          "84,180.00",
+        ],
+      },
+    ],
   },
   positions: {
-    columns: ["Instrument", "Position", "Entry Price", "Mark", "PnL"],
-    rows: [{ cells: ["BTCUSDC-CVXPERP", "+5.00 BTC", "83,620.00", "84,250.00", "+$3,150"], positiveCellIndexes: [4] }],
+    columns: ["Instrument", "Entry Ref", "Convex Notional", "Delta Eq", "Mark", "PnL"],
+    rows: [{ cells: ["BTCUSDC-CVXPERP", "83,620.00", "$182,500", "4.07 BTC", "84,250.00", "+$2,765"], positiveCellIndexes: [5] }],
   },
   "trade-history": {
-    columns: ["Time", "Instrument", "Side", "Size", "Price"],
+    columns: ["Time", "Instrument", "Bias", "Delta Eq", "Price"],
     rows: [
-      { cells: ["10:08:14", "BTCUSDC-CVXPERP", "Buy BTC", "2.00", "84,265.00"] },
-      { cells: ["10:08:06", "BTCUSDC-CVXPERP", "Sell BTC", "1.25", "84,250.00"] },
+      { cells: ["10:08:14", "BTCUSDC-CVXPERP", "Long Convexity", "1.52 BTC", "84,265.00"] },
+      { cells: ["10:08:06", "BTCUSDC-CVXPERP", "Short Convexity", "0.94 BTC", "84,250.00"] },
     ],
   },
 } satisfies Record<string, ActivityView>;

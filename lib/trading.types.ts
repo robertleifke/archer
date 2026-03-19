@@ -14,9 +14,47 @@ export type Candle = {
 };
 
 export type OrderBookLevel = {
+  convexUnits?: number;
+  deltaEquivalent?: number;
+  distanceBps?: number;
   price: number;
+  riskAdjustedSize?: number;
   size: number;
   total: number;
+};
+
+export type OrderBookDisplayMode = "convex" | "delta" | "price";
+
+export type ConvexSizingMode = "convex" | "delta" | "notional";
+
+export type ConvexExposureMetrics = {
+  convexNotionalUsd: number;
+  convexityExposurePer1PctSquared: number;
+  convexUnits: number;
+  deltaEquivalentBtc: number;
+  entryReferencePrice: number;
+  gammaPer1kMove: number;
+  markPrice: number;
+  pnlUsd: number;
+  side: "buy" | "sell";
+};
+
+export type ConvexRiskModel = {
+  convexityRisk: number;
+  fundingRateBps: number;
+  inventorySkew: number;
+  ladderType: "nonlinear";
+  realizedVol: number;
+  spreadBps: number;
+  topLevelSizeFactor: number;
+};
+
+export type ContractPresentation = {
+  displayMode?: OrderBookDisplayMode;
+  nonlinearLadderLabel?: string;
+  riskModel?: ConvexRiskModel;
+  sizingModes?: ConvexSizingMode[];
+  variant: "convex" | "linear";
 };
 
 export type TradePrint = {
@@ -65,6 +103,7 @@ export type ContractMarket = {
   mark: string;
   orderBookAsks: OrderBookLevel[];
   orderBookBids: OrderBookLevel[];
+  presentation?: ContractPresentation;
   positionOverview: DeliveryTerm[];
   ticker: string;
   timeToExpiry: string;

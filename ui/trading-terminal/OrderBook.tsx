@@ -1,5 +1,10 @@
 import { MoreHorizontal } from "lucide-react";
-import type { OrderBookLevel, TradePrint } from "@/lib/trading.types";
+import type {
+  ConvexRiskModel,
+  OrderBookDisplayMode,
+  OrderBookLevel,
+  TradePrint,
+} from "@/lib/trading.types";
 import { cn } from "@/lib/cn";
 
 function formatPrice(value: number) {
@@ -9,17 +14,44 @@ function formatPrice(value: number) {
   }).format(value);
 }
 
-function formatSize(value: number) {
+function formatDepth(value: number) {
   return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
   }).format(value);
 }
 
+function formatDisplayValue(level: OrderBookLevel, mode: OrderBookDisplayMode) {
+  if (mode === "delta") {
+    return `${level.deltaEquivalent?.toFixed(2) ?? "0.00"} BTC`;
+  }
+
+  if (mode === "convex") {
+    return `${level.convexUnits?.toFixed(2) ?? "0.00"} cvx`;
+  }
+
+  return formatPrice(level.price);
+}
+
+function getDisplayLabel(mode: OrderBookDisplayMode) {
+  if (mode === "delta") {
+    return "Delta Eq";
+  }
+
+  if (mode === "convex") {
+    return "Convex";
+  }
+
+  return "Price";
+}
+
 function OrderRow({
+  displayMode,
   level,
   maxTotal,
   side,
 }: {
+  displayMode: OrderBookDisplayMode;
   level: OrderBookLevel;
   maxTotal: number;
   side: "ask" | "bid";
@@ -27,7 +59,7 @@ function OrderRow({
   const width = `${(level.total / maxTotal) * 100}%`;
 
   return (
-    <div className="relative grid grid-cols-3 px-2.5 py-1 text-[11px]">
+    <div className="relative grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] px-2.5 py-1 text-[11px]">
       <div
         className={cn(
           "absolute inset-y-0 right-0 rounded-sm",
@@ -41,10 +73,12 @@ function OrderRow({
           side === "ask" ? "text-[#D59C9C]" : "text-[#8CC9A3]",
         )}
       >
-        {formatPrice(level.price)}
+        {formatDisplayValue(level, displayMode)}
       </span>
-      <span className="relative z-10 text-right font-medium text-[#D1D5DB]">{formatSize(level.size)}</span>
-      <span className="relative z-10 text-right text-[#9CA3AF]">{formatSize(level.total)}</span>
+      <span className="relative z-10 text-right font-medium text-[#D1D5DB]">
+        {formatDepth(level.size)}
+      </span>
+      <span className="relative z-10 text-right text-[#9CA3AF]">{formatDepth(level.total)}</span>
     </div>
   );
 }
@@ -53,15 +87,23 @@ export function OrderBook({
   asks,
   bids,
   contractLabel,
+  displayMode,
+  nonlinearLadderLabel,
+  riskModel,
   trades,
   view,
+  onDisplayModeChange,
   onViewChange,
 }: {
   asks: OrderBookLevel[];
   bids: OrderBookLevel[];
   contractLabel: string;
+  displayMode: OrderBookDisplayMode;
+  nonlinearLadderLabel?: string;
+  riskModel?: ConvexRiskModel;
   trades: TradePrint[];
   view: "Order Book" | "Trades";
+  onDisplayModeChange: (mode: OrderBookDisplayMode) => void;
   onViewChange: (view: "Order Book" | "Trades") => void;
 }) {
   const askMax = Math.max(1, ...asks.map((level) => level.total));
@@ -74,11 +116,11 @@ export function OrderBook({
 
   return (
     <section className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-md border border-[#1B2430] bg-[#0F1720] xl:min-h-0">
-      <div className="flex items-center justify-between border-[#1B2430] border-b px-2.5 py-1">
-        <div className="flex items-center gap-2 font-medium text-xs">
+      <div className="flex items-center justify-between gap-2 border-[#1B2430] border-b px-2.5 py-1">
+        <div className="flex min-w-0 items-center gap-1.5 font-medium text-xs">
           <button
             className={cn(
-              "rounded-sm px-2 py-1",
+              "whitespace-nowrap rounded-sm px-2 py-1",
               view === "Order Book" ? "bg-[#11161D] text-[#E5E7EB]" : "text-[#6B7280]",
             )}
             onClick={() => onViewChange("Order Book")}
@@ -88,7 +130,7 @@ export function OrderBook({
           </button>
           <button
             className={cn(
-              "rounded-sm px-2 py-1",
+              "whitespace-nowrap rounded-sm px-2 py-1",
               view === "Trades" ? "bg-[#11161D] text-[#E5E7EB]" : "text-[#6B7280]",
             )}
             onClick={() => onViewChange("Trades")}
@@ -96,29 +138,52 @@ export function OrderBook({
           >
             Trades
           </button>
+          {nonlinearLadderLabel ? (
+            <span className="whitespace-nowrap rounded-full border border-[#1F3C55] bg-[#0E2233] px-2 py-0.5 text-[#93C5FD] text-[10px] leading-none">
+              {nonlinearLadderLabel}
+            </span>
+          ) : null}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="hidden items-center gap-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-1 md:flex">
+            {(["price", "delta", "convex"] as const).map((mode) => (
+              <button
+                className={cn(
+                  "whitespace-nowrap rounded-sm px-2 py-1 text-[10px]",
+                  displayMode === mode ? "bg-[#172554]/50 text-[#BFDBFE]" : "text-[#6B7280]",
+                )}
+                key={mode}
+                onClick={() => onDisplayModeChange(mode)}
+                type="button"
+              >
+                {getDisplayLabel(mode)}
+              </button>
+            ))}
+          </div>
           <button className="rounded-sm p-1.5 text-[#6B7280] hover:bg-[#11161D]" type="button">
             <MoreHorizontal className="size-4" />
           </button>
-          <button className="rounded-sm border border-[#1B2430] bg-[#11161D] px-2 py-1 text-[#D1D5DB] text-xs" type="button">
+          <button
+            className="whitespace-nowrap rounded-sm border border-[#1B2430] bg-[#11161D] px-2 py-1 text-[#D1D5DB] text-xs"
+            type="button"
+          >
             {contractLabel}
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 border-[#1B2430] border-b px-2.5 py-1 text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">
-        <span>Price</span>
-        <span className="text-right">Size</span>
-        <span className="text-right">Total</span>
+      <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] border-[#1B2430] border-b px-2.5 py-1 text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">
+        <span>{getDisplayLabel(displayMode)}</span>
+        <span className="text-right">Depth</span>
+        <span className="text-right">Cum</span>
       </div>
 
       {view === "Order Book" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="overflow-hidden">
             {asks.map((level) => (
-              <OrderRow key={level.price} level={level} maxTotal={askMax} side="ask" />
+              <OrderRow displayMode={displayMode} key={level.price} level={level} maxTotal={askMax} side="ask" />
             ))}
           </div>
 
@@ -126,17 +191,36 @@ export function OrderBook({
             <div className="flex items-center justify-between">
               <span className="font-medium text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">Spread</span>
               <div className="flex items-center gap-2 text-[11px]">
-                <span className="font-semibold text-[#E5E7EB]">{spread === null ? "N/A" : formatPrice(spread)}</span>
+                <span className="font-semibold text-[#E5E7EB]">
+                  {spread === null ? "N/A" : formatPrice(spread)}
+                </span>
                 <span className="text-[#60A5FA]">
                   {spreadPercent === null ? "Waiting" : `${spreadPercent.toFixed(3)}%`}
                 </span>
               </div>
             </div>
+
+            {riskModel ? (
+              <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
+                <span className="text-[#6B7280]">
+                  Vol <span className="text-[#D1D5DB]">{(riskModel.realizedVol * 100).toFixed(1)}%</span>
+                </span>
+                <span className="text-right text-[#6B7280]">
+                  Inv skew <span className="text-[#D1D5DB]">{riskModel.inventorySkew.toFixed(2)}</span>
+                </span>
+                <span className="text-[#6B7280]">
+                  Funding <span className="text-[#D1D5DB]">{riskModel.fundingRateBps.toFixed(2)} bps</span>
+                </span>
+                <span className="text-right text-[#6B7280]">
+                  Top size <span className="text-[#D1D5DB]">{riskModel.topLevelSizeFactor.toFixed(2)}x</span>
+                </span>
+              </div>
+            ) : null}
           </div>
 
           <div className="overflow-hidden">
             {bids.map((level) => (
-              <OrderRow key={level.price} level={level} maxTotal={bidMax} side="bid" />
+              <OrderRow displayMode={displayMode} key={level.price} level={level} maxTotal={bidMax} side="bid" />
             ))}
           </div>
 
@@ -153,7 +237,7 @@ export function OrderBook({
               <span className={cn("font-semibold", trade.side === "buy" ? "text-[#8CC9A3]" : "text-[#D59C9C]")}>
                 {formatPrice(trade.price)}
               </span>
-              <span className="text-right text-[#D1D5DB]">{formatSize(trade.size)}</span>
+              <span className="text-right text-[#D1D5DB]">{formatDepth(trade.size)}</span>
               <span className="text-right text-[#9CA3AF]">{trade.time}</span>
             </div>
           ))}

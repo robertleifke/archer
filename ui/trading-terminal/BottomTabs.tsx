@@ -77,7 +77,7 @@ export function BottomTabs({
               {row.cells.map((cell, cellIndex) => (
                 <span
                   className={cn(
-                    "text-[#D1D5DB]",
+                    "min-w-0 truncate text-[#D1D5DB]",
                     cellIndex === 0 && "font-medium text-[#E5E7EB]",
                     activityView.columns[cellIndex] === "PnL" && "text-right",
                     row.positiveCellIndexes?.includes(cellIndex) && "font-medium text-[#8CC9A3]",
