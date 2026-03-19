@@ -1,5 +1,6 @@
 "use client";
 
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 import type { CHART_CONTEXT_TABS, CHART_RANGE_BUTTONS, TIMEFRAME_OPTIONS } from "@/lib/mock-trading-data";
 import type { CONTRACT_LABELS } from "@/lib/mock-trading-data";
@@ -256,6 +257,8 @@ export function TradingTerminal({
   initialBtcSnapshot: BtcSquaredPerpSnapshot | null;
   initialNgnSnapshot: NgnPerpSnapshot | null;
 }) {
+  const { authenticated, ready: privyReady } = usePrivy();
+  const { ready: walletsReady, wallets } = useWallets();
   const [selectedMarketId, setSelectedMarketId] = useState("btc-usd-futures");
   const [selectedSymbol, setSelectedSymbol] =
     useState<keyof typeof INSTRUMENT_MARKETS>(DEFAULT_SYMBOL);
@@ -350,10 +353,15 @@ export function TradingTerminal({
   const [liveCandles, setLiveCandles] = useState<Candle[]>(displayCandles);
   const displayOrderBookAsks = liveBtcOrderBook ? btcOrderBook.asks : market.orderBookAsks;
   const displayOrderBookBids = liveBtcOrderBook ? btcOrderBook.bids : market.orderBookBids;
+  const walletConnected = privyReady && walletsReady && authenticated && wallets.length > 0;
   const tradeSubmissionEnabled = false;
-  const tradeSubmissionNotice = isBtcSquaredMarket
-    ? "Live Square perp depth is coming from matching-backend. Order entry stays read only until Archer has wallet signing for the backend action payload."
-    : "Order entry is still using static terminal data for this market.";
+  let tradeSubmissionNotice = "Order entry is still using static terminal data for this market.";
+
+  if (isBtcSquaredMarket) {
+    tradeSubmissionNotice = walletConnected
+      ? "Wallet connected. Live convex perpetual depth is coming from matching-backend, but order entry stays read only until Archer wires signed backend actions."
+      : "Connect a wallet to prepare for signing. Live convex perpetual depth is coming from matching-backend, but order entry stays read only until Archer wires signed backend actions.";
+  }
 
   const refreshBtcSquaredMarket = useEffectEvent(async function refreshBtcSquaredMarket() {
     try {

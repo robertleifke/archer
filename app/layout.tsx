@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
+import { AppPrivyProvider } from "@/ui/providers/PrivyProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
+        <AppPrivyProvider>{children}</AppPrivyProvider>
         {process.env.NODE_ENV === "development" ? (
           <Script
             crossOrigin="anonymous"

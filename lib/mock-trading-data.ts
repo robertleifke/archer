@@ -247,7 +247,7 @@ export const CONTRACT_TABS = CONTRACT_LABELS.map((label) => ({
 
 const FUTURES_DISPLAY_SYMBOL = {
   "BTC/USD": "BTCUSDC-CVXPERP",
-  "ETH/USD": "ETHUSDC-SQPERP",
+  "ETH/USD": "ETHUSDC-CVXPERP",
   "NGN/USD": "NGNUSDC-PERP",
 } as const satisfies Record<"BTC/USD" | "ETH/USD" | "NGN/USD", string>;
 
@@ -382,7 +382,7 @@ function buildBtcContractMarket(
     id: label,
     index: meta.index,
     infoBar: [
-      { label: "Contract Type", value: "Squared Perpetual" },
+      { label: "Contract Type", value: "Convex Perpetual" },
       { label: "Settlement", value: "USDC" },
       { label: "Mark Price", value: meta.mark },
       { label: "24h Change", tone: "accent", value: "+2.84%" },
@@ -433,7 +433,7 @@ function buildEthContractMarket(
     id: label,
     index: meta.index,
     infoBar: [
-      { label: "Contract Type", value: "Squared Perpetual" },
+      { label: "Contract Type", value: "Convex Perpetual" },
       { label: "Settlement", value: "USDC" },
       { label: "Mark Price", value: meta.mark },
       { label: "24h Change", tone: "accent", value: "+1.92%" },
@@ -484,7 +484,7 @@ function buildNgnContractMarket(
     id: label,
     index: meta.index,
     infoBar: [
-      { label: "Contract Type", value: "Squared Perpetual" },
+      { label: "Contract Type", value: "Convex Perpetual" },
       { label: "Settlement", value: "USDC" },
       { label: "Mark Price", value: meta.mark },
       { label: "24h Change", tone: "accent", value: "+0.74%" },

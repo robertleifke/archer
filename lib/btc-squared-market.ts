@@ -87,7 +87,7 @@ export async function getBtcSquaredPerpSnapshot(): Promise<BtcSquaredPerpSnapsho
   }
 
   if (perpResult.status === "rejected") {
-    console.warn("BTC squared perp price read failed:", perpResult.reason);
+    console.warn("BTC convex perp price read failed:", perpResult.reason);
   }
 
   if (indexResult.status === "rejected" && perpResult.status === "rejected") {

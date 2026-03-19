@@ -8,6 +8,7 @@
     "@effect/platform": "^0.94.3",
     "@effect/platform-node": "^0.104.1",
     "@prb/effect-next": "^1.0.0",
+    "@privy-io/react-auth": "^3.17.0",
     "client-only": "^0.0.1",
     "effect": "^3.19.16",
     "lucide-react": "^0.563.0",

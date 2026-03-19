@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { ChevronDown, Dot, Search, X } from "lucide-react";
 import type { ContractTab, MarketOption, MarketStat } from "@/lib/trading.types";
 import { cn } from "@/lib/cn";
@@ -31,6 +32,10 @@ function getMarketLabelParts(symbol: string) {
   };
 }
 
+function formatWalletLabel(address: string) {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
 export function MarketHeader({
   contractTabs,
   currentContract,
@@ -55,8 +60,11 @@ export function MarketHeader({
   const [marketSearch, setMarketSearch] = useState("");
   const [selectedPrimaryTab, setSelectedPrimaryTab] =
     useState<(typeof primaryTabs)[number]>("All");
+  const { authenticated, login, logout, ready } = usePrivy();
+  const { ready: walletsReady, wallets } = useWallets();
   const normalizedSearch = marketSearch.trim().toLowerCase();
   const currentMarketIcon = getMarketIcon(currentSymbol);
+  const connectedWalletAddress = wallets[0]?.address ?? null;
   const filteredMarkets = marketOptions.filter((market) => {
     const matchesPrimary =
       selectedPrimaryTab === "All" ||
@@ -239,6 +247,32 @@ export function MarketHeader({
               ))}
             </div>
           ) : null}
+
+          <div className="flex items-center gap-2">
+            {ready && walletsReady && authenticated && connectedWalletAddress ? (
+              <>
+                <div className="rounded-sm border border-[#1B2430] bg-[#11161D] px-3 py-2 font-medium text-[#BFDBFE] text-xs">
+                  {formatWalletLabel(connectedWalletAddress)}
+                </div>
+                <button
+                  className="rounded-sm border border-[#1B2430] bg-[#11161D] px-3 py-2 font-medium text-[#9CA3AF] text-xs transition-colors hover:text-[#E5E7EB]"
+                  onClick={() => void logout()}
+                  type="button"
+                >
+                  Disconnect
+                </button>
+              </>
+            ) : (
+              <button
+                className="rounded-sm border border-[#2563EB] bg-[#172554]/50 px-3 py-2 font-semibold text-[#BFDBFE] text-xs transition-colors hover:bg-[#1D4ED8]/20"
+                disabled={!ready}
+                onClick={() => login()}
+                type="button"
+              >
+                {ready ? "Connect Wallet" : "Loading Wallet"}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex h-9 flex-wrap items-center gap-2 overflow-hidden rounded-sm border border-[#1B2430] bg-[#11161D] px-3 text-[11px]">
