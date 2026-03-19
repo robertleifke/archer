@@ -15,7 +15,7 @@ export type BtcSquaredPerpSnapshot = {
   indexSquaredUsd: number;
   markSquaredUsd: number;
   markSource: "index_fallback" | "perp";
-  pair: "BTCUSDC-SQPERP";
+  pair: "BTCUSDC-CVXPERP";
 };
 
 function getBaseMainnetRpcUrl() {
@@ -117,6 +117,6 @@ export async function getBtcSquaredPerpSnapshot(): Promise<BtcSquaredPerpSnapsho
     indexSquaredUsd,
     markSquaredUsd,
     markSource: fallbackUsed ? "index_fallback" : "perp",
-    pair: "BTCUSDC-SQPERP",
+    pair: "BTCUSDC-CVXPERP",
   };
 }

@@ -246,19 +246,19 @@ export const CONTRACT_TABS = CONTRACT_LABELS.map((label) => ({
 })) satisfies ContractTab[];
 
 const FUTURES_DISPLAY_SYMBOL = {
-  "BTC/USD": "BTCUSDC-SQPERP",
+  "BTC/USD": "BTCUSDC-CVXPERP",
   "ETH/USD": "ETHUSDC-SQPERP",
   "NGN/USD": "NGNUSDC-PERP",
 } as const satisfies Record<"BTC/USD" | "ETH/USD" | "NGN/USD", string>;
 
 export const MARKET_OPTIONS = [
   {
-    frontMonth: "SQPERP",
+    frontMonth: "CVXPERP",
     id: "btc-usd-futures",
     lastPrice: "84,205.00",
     marketType: "Futures",
     region: "Crypto",
-    symbol: "BTCUSDC-SQPERP",
+    symbol: "BTCUSDC-CVXPERP",
   },
   {
     frontMonth: "PERP",
@@ -551,17 +551,17 @@ export const BOTTOM_TABS = [
 export const ACTIVITY_VIEWS = {
   "open-orders": {
     columns: ["Instrument", "Side", "Type", "Size", "Price"],
-    rows: [{ cells: ["BTCUSDC-SQPERP", "Buy BTC", "Limit", "1.50", "84,180.00"] }],
+    rows: [{ cells: ["BTCUSDC-CVXPERP", "Buy BTC", "Limit", "1.50", "84,180.00"] }],
   },
   positions: {
     columns: ["Instrument", "Position", "Entry Price", "Mark", "PnL"],
-    rows: [{ cells: ["BTCUSDC-SQPERP", "+5.00 BTC", "83,620.00", "84,250.00", "+$3,150"], positiveCellIndexes: [4] }],
+    rows: [{ cells: ["BTCUSDC-CVXPERP", "+5.00 BTC", "83,620.00", "84,250.00", "+$3,150"], positiveCellIndexes: [4] }],
   },
   "trade-history": {
     columns: ["Time", "Instrument", "Side", "Size", "Price"],
     rows: [
-      { cells: ["10:08:14", "BTCUSDC-SQPERP", "Buy BTC", "2.00", "84,265.00"] },
-      { cells: ["10:08:06", "BTCUSDC-SQPERP", "Sell BTC", "1.25", "84,250.00"] },
+      { cells: ["10:08:14", "BTCUSDC-CVXPERP", "Buy BTC", "2.00", "84,265.00"] },
+      { cells: ["10:08:06", "BTCUSDC-CVXPERP", "Sell BTC", "1.25", "84,250.00"] },
     ],
   },
 } satisfies Record<string, ActivityView>;

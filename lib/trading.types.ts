@@ -90,7 +90,7 @@ export type BtcSquaredPerpSnapshot = {
   indexSquaredUsd: number;
   markSquaredUsd: number;
   markSource: "index_fallback" | "perp";
-  pair: "BTCUSDC-SQPERP";
+  pair: "BTCUSDC-CVXPERP";
 };
 
 export type MatchingBackendOrderBookSnapshot = {
