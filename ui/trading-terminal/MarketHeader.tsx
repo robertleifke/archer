@@ -95,8 +95,8 @@ export function MarketHeader({
   return (
     <header className="rounded-md border border-[#1B2430] bg-[#0F1720]">
       <div className="flex flex-col gap-1.5 px-3 py-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <SmartImage<string>
               alt="Archer"
               className="ml-3 h-6 w-24 shrink-0 sm:h-7 sm:w-28"
@@ -248,7 +248,7 @@ export function MarketHeader({
             </div>
           ) : null}
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 self-start">
             {ready && walletsReady && authenticated && connectedWalletAddress ? (
               <>
                 <div className="rounded-sm border border-[#1B2430] bg-[#11161D] px-3 py-2 font-medium text-[#BFDBFE] text-xs">
@@ -264,20 +264,20 @@ export function MarketHeader({
               </>
             ) : (
               <button
-                className="rounded-sm border border-[#2563EB] bg-[#172554]/50 px-3 py-2 font-semibold text-[#BFDBFE] text-xs transition-colors hover:bg-[#1D4ED8]/20"
+                className="rounded-sm border border-[#2563EB] bg-[#172554]/50 px-3 py-2 font-semibold text-[#BFDBFE] text-xs transition-colors hover:bg-[#1D4ED8]/20 disabled:cursor-wait disabled:opacity-70"
                 disabled={!ready}
                 onClick={() => login()}
                 type="button"
               >
-                {ready ? "Connect Wallet" : "Loading Wallet"}
+                Connect Wallet
               </button>
             )}
           </div>
         </div>
 
-        <div className="flex h-9 flex-wrap items-center gap-2 overflow-hidden rounded-sm border border-[#1B2430] bg-[#11161D] px-3 text-[11px]">
+        <div className="flex min-h-9 items-center gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap rounded-sm border border-[#1B2430] bg-[#11161D] px-3 py-2 text-[11px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {infoBar.map((stat, index) => (
-            <div className="flex items-center gap-2" key={stat.label}>
+            <div className="flex shrink-0 items-center gap-2" key={stat.label}>
               {index > 0 ? <Dot className="size-3 text-[#374151]" /> : null}
               <span className="font-medium text-[#9CA3AF]">{stat.label}</span>
               <span
