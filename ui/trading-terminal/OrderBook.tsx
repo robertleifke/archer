@@ -145,22 +145,7 @@ export function OrderBook({
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <div className="hidden items-center gap-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-1 md:flex">
-            {(["price", "delta", "convex"] as const).map((mode) => (
-              <button
-                className={cn(
-                  "whitespace-nowrap rounded-sm px-2 py-1 text-[10px]",
-                  displayMode === mode ? "bg-[#172554]/50 text-[#BFDBFE]" : "text-[#6B7280]",
-                )}
-                key={mode}
-                onClick={() => onDisplayModeChange(mode)}
-                type="button"
-              >
-                {getDisplayLabel(mode)}
-              </button>
-            ))}
-          </div>
+        <div className="flex shrink-0 items-center gap-1.5">
           <button className="rounded-sm p-1.5 text-[#6B7280] hover:bg-[#11161D]" type="button">
             <MoreHorizontal className="size-4" />
           </button>
@@ -171,6 +156,30 @@ export function OrderBook({
             {contractLabel}
           </button>
         </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-2 border-[#1B2430] border-b bg-[#0D141D] px-2.5 py-1">
+        <div className="flex min-w-0 items-center gap-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-1">
+          {(["price", "delta", "convex"] as const).map((mode) => (
+            <button
+              className={cn(
+                "whitespace-nowrap rounded-sm px-2 py-1 text-[10px]",
+                displayMode === mode ? "bg-[#172554]/50 text-[#BFDBFE]" : "text-[#6B7280]",
+              )}
+              key={mode}
+              onClick={() => onDisplayModeChange(mode)}
+              type="button"
+            >
+              {getDisplayLabel(mode)}
+            </button>
+          ))}
+        </div>
+
+        {nonlinearLadderLabel ? (
+          <span className="shrink-0 whitespace-nowrap rounded-full border border-[#1F3C55] bg-[#0E2233] px-2 py-0.5 text-[#93C5FD] text-[10px] leading-none">
+            {nonlinearLadderLabel}
+          </span>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] border-[#1B2430] border-b px-2.5 py-1 text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">
