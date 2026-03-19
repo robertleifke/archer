@@ -138,11 +138,6 @@ export function OrderBook({
           >
             Trades
           </button>
-          {nonlinearLadderLabel ? (
-            <span className="whitespace-nowrap rounded-full border border-[#1F3C55] bg-[#0E2233] px-2 py-0.5 text-[#93C5FD] text-[10px] leading-none">
-              {nonlinearLadderLabel}
-            </span>
-          ) : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
