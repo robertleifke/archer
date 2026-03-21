@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { ChevronDown, Dot, Search, X } from "lucide-react";
-import type { ContractTab, MarketOption, MarketStat } from "@/lib/trading.types";
+import { ChevronDown, Dot, Info, Search, X } from "lucide-react";
+import type { ContractTab, MarketOption, MarketSemantics, MarketStat } from "@/lib/trading.types";
 import { cn } from "@/lib/cn";
 import { SmartImage } from "@/ui/SmartImage";
 
@@ -36,10 +36,16 @@ function formatWalletLabel(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+function getTrustStat(infoBar: MarketStat[], label: string) {
+  return infoBar.find((stat) => stat.label === label)?.value ?? "\u2014";
+}
+
 export function MarketHeader({
   contractTabs,
   currentContract,
+  currentDisplayName,
   currentMarketId,
+  currentSemantics,
   currentSymbol,
   infoBar,
   marketOptions,
@@ -48,14 +54,16 @@ export function MarketHeader({
 }: {
   contractTabs: ContractTab[];
   currentContract: string;
+  currentDisplayName: string;
   currentMarketId: string;
+  currentSemantics?: MarketSemantics;
   currentSymbol: string;
   infoBar: MarketStat[];
   marketOptions: MarketOption[];
   onContractSelect: (contract: string) => void;
   onMarketSelect: (marketId: string) => void;
 }) {
-  const primaryTabs = ["All", "Crypto", "FX"] as const;
+  const primaryTabs = ["All", "Crypto"] as const;
   const [marketSearchOpen, setMarketSearchOpen] = useState(false);
   const [marketSearch, setMarketSearch] = useState("");
   const [selectedPrimaryTab, setSelectedPrimaryTab] =
@@ -65,11 +73,12 @@ export function MarketHeader({
   const normalizedSearch = marketSearch.trim().toLowerCase();
   const currentMarketIcon = getMarketIcon(currentSymbol);
   const connectedWalletAddress = wallets[0]?.address ?? null;
+  const markVolValue = getTrustStat(infoBar, "Mark Vol");
+  const varianceMarkValue = getTrustStat(infoBar, "Variance Mark");
   const filteredMarkets = marketOptions.filter((market) => {
     const matchesPrimary =
       selectedPrimaryTab === "All" ||
-      (selectedPrimaryTab === "Crypto" && market.region === "Crypto") ||
-      (selectedPrimaryTab === "FX" && market.region === "FX");
+      (selectedPrimaryTab === "Crypto" && market.region === "Crypto");
 
     if (!matchesPrimary) {
       return false;
@@ -81,7 +90,9 @@ export function MarketHeader({
 
     return (
       market.symbol.toLowerCase().includes(normalizedSearch) ||
+      (market.displayName?.toLowerCase().includes(normalizedSearch) ?? false) ||
       market.frontMonth.toLowerCase().includes(normalizedSearch) ||
+      (market.subtitle?.toLowerCase().includes(normalizedSearch) ?? false) ||
       market.lastPrice.toLowerCase().includes(normalizedSearch)
     );
   });
@@ -124,7 +135,14 @@ export function MarketHeader({
                     />
                   </span>
                 ) : null}
-                <span className="font-semibold text-[#E5E7EB] text-sm">{currentSymbol}</span>
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold text-[#E5E7EB] text-sm">
+                    {currentSemantics?.shortDisplayName ?? currentSymbol}
+                  </span>
+                  <span className="block truncate text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">
+                    {currentSymbol}
+                  </span>
+                </span>
                 <ChevronDown className="size-4 text-[#6B7280]" />
               </button>
 
@@ -183,39 +201,46 @@ export function MarketHeader({
 
                         return (
                           <button
-                          className={cn(
-                            "grid w-full grid-cols-[minmax(0,1fr)_78px_96px] items-center gap-3 border-[#1B2430] border-b px-3 py-2.5 text-left transition-colors hover:bg-[#151B23]/40",
-                            currentMarketId === market.id && "bg-[#172554]/20",
-                          )}
-                          key={market.id}
-                          onClick={() => handleMarketPick(market.id)}
-                          type="button"
-                        >
-                          <span className="flex min-w-0 items-center gap-2 font-semibold text-[#E5E7EB] text-sm">
-                            {getMarketIcon(market.symbol) ? (
-                              <SmartImage<string>
-                                alt=""
-                                aria-hidden="true"
-                                className="size-4 shrink-0"
-                                imgClassName="object-contain"
-                                src={getMarketIcon(market.symbol) ?? ""}
-                              />
-                            ) : null}
-                            <span className="truncate">{baseSymbol}</span>
-                          </span>
-
-                          <div
                             className={cn(
-                              "font-medium text-[11px]",
-                              currentMarketId === market.id ? "text-[#BFDBFE]" : "text-[#9CA3AF]",
+                              "grid w-full grid-cols-[minmax(0,1fr)_78px_96px] items-center gap-3 border-[#1B2430] border-b px-3 py-2.5 text-left transition-colors hover:bg-[#151B23]/40",
+                              currentMarketId === market.id && "bg-[#172554]/20",
                             )}
+                            key={market.id}
+                            onClick={() => handleMarketPick(market.id)}
+                            type="button"
                           >
-                            {contractLabel || market.frontMonth}
-                          </div>
+                            <span className="min-w-0">
+                              <span className="flex min-w-0 items-center gap-2 font-semibold text-[#E5E7EB] text-sm">
+                                {getMarketIcon(market.symbol) ? (
+                                  <SmartImage<string>
+                                    alt=""
+                                    aria-hidden="true"
+                                    className="size-4 shrink-0"
+                                    imgClassName="object-contain"
+                                    src={getMarketIcon(market.symbol) ?? ""}
+                                  />
+                                ) : null}
+                                <span className="truncate">{baseSymbol}</span>
+                              </span>
+                              {market.subtitle ? (
+                                <span className="mt-0.5 block truncate text-[#6B7280] text-[10px]">
+                                  {market.subtitle}
+                                </span>
+                              ) : null}
+                            </span>
 
-                          <span className="text-right font-semibold text-[#D1D5DB] text-[11px]">
-                            {market.lastPrice}
-                          </span>
+                            <div
+                              className={cn(
+                                "font-medium text-[11px]",
+                                currentMarketId === market.id ? "text-[#BFDBFE]" : "text-[#9CA3AF]",
+                              )}
+                            >
+                              {market.contractLabel ?? contractLabel ?? market.frontMonth}
+                            </div>
+
+                            <span className="text-right font-semibold text-[#D1D5DB] text-[11px]">
+                              {market.lastPrice}
+                            </span>
                           </button>
                         );
                       })
@@ -272,6 +297,41 @@ export function MarketHeader({
                 Connect Wallet
               </button>
             )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1 rounded-sm border border-[#1B2430] bg-[#11161D] px-3 py-2">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-[#E5E7EB] text-sm">{currentDisplayName}</span>
+              {currentSemantics?.marketTag ? (
+                <span className="rounded-full border border-[#1F3C55] bg-[#0E2233] px-2 py-0.5 text-[#93C5FD] text-[10px] uppercase tracking-[0.12em]">
+                  {currentSemantics.marketTag}
+                </span>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-sm border border-[#1F2937] bg-[#0C1219] px-2 py-1.5">
+                <div className="text-[#6B7280] text-[10px] uppercase tracking-[0.12em]">Mark Vol</div>
+                <div className="font-semibold text-[#E5E7EB] text-sm">{markVolValue}</div>
+              </div>
+              <div className="rounded-sm border border-[#1F2937] bg-[#0C1219] px-2 py-1.5">
+                <div className="text-[#6B7280] text-[10px] uppercase tracking-[0.12em]">Variance Mark</div>
+                <div className="font-semibold text-[#E5E7EB] text-sm">{varianceMarkValue}</div>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[#6B7280] text-[11px]">
+            <span>Internally priced and settled in implied variance</span>
+            {currentSemantics ? (
+              <span
+                className="inline-flex items-center gap-1 text-[#9CA3AF]"
+                title="Orders are matched using implied variance. The interface displays the equivalent 30-day implied volatility."
+              >
+                <Info className="size-3" />
+                {currentSemantics.infoHint}
+              </span>
+            ) : null}
           </div>
         </div>
 

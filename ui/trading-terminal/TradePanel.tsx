@@ -1,5 +1,13 @@
 import { ChevronDown, Info } from "lucide-react";
+import {
+  formatExposureUsd,
+  formatFundingVarianceBps,
+  formatVariancePrice,
+  formatVolPercentFromVariance,
+} from "@/lib/btcvar30-display";
 import type {
+  BtcConvexAccountSnapshot,
+  BtcConvexRiskSnapshot,
   ConvexExposureMetrics,
   ConvexSizingMode,
   DeliveryTerm,
@@ -41,11 +49,11 @@ function LabelValueRow({
 
 function getSizingModeLabel(mode: ConvexSizingMode) {
   if (mode === "convex") {
-    return "Convex";
+    return "Variance";
   }
 
   if (mode === "delta") {
-    return "Delta Eq";
+    return "Spot Sens";
   }
 
   return "Notional";
@@ -53,7 +61,7 @@ function getSizingModeLabel(mode: ConvexSizingMode) {
 
 function getInputSuffix(baseAsset: string, mode: ConvexSizingMode) {
   if (mode === "convex") {
-    return "cvx";
+    return "var";
   }
 
   if (mode === "delta") {
@@ -65,6 +73,7 @@ function getInputSuffix(baseAsset: string, mode: ConvexSizingMode) {
 
 export function TradePanel({
   allocation,
+  accountSnapshot,
   baseAsset,
   contractDetails,
   contractLabel,
@@ -75,11 +84,14 @@ export function TradePanel({
   positionOverview,
   postOnly,
   quoteAsset,
+  riskSnapshot,
   settlementWallet,
   size,
   sizingMode,
   submissionEnabled,
+  submissionPending,
   submissionNotice,
+  submitLabel,
   supportedSizingModes,
   tradeSide,
   onAllocationChange,
@@ -88,8 +100,10 @@ export function TradePanel({
   onSideChange,
   onSizeChange,
   onSizingModeChange,
+  onSubmit,
 }: {
   allocation: number;
+  accountSnapshot: BtcConvexAccountSnapshot | null;
   baseAsset: string;
   contractDetails: DeliveryTerm[];
   contractLabel: string;
@@ -100,11 +114,14 @@ export function TradePanel({
   positionOverview: DeliveryTerm[];
   postOnly: boolean;
   quoteAsset: string;
+  riskSnapshot: BtcConvexRiskSnapshot | null;
   settlementWallet: string;
   size: string;
   sizingMode: ConvexSizingMode;
   submissionEnabled: boolean;
+  submissionPending: boolean;
   submissionNotice: string;
+  submitLabel: string;
   supportedSizingModes: ConvexSizingMode[];
   tradeSide: "buy" | "sell";
   onAllocationChange: (value: number) => void;
@@ -113,7 +130,16 @@ export function TradePanel({
   onSideChange: (side: "buy" | "sell") => void;
   onSizeChange: (value: string) => void;
   onSizingModeChange: (mode: ConvexSizingMode) => void;
+  onSubmit: () => void;
 }) {
+  let freeCollateralValue = `-- ${quoteAsset}`;
+
+  if (riskSnapshot) {
+    freeCollateralValue = `${riskSnapshot.freeCollateralUsdDisplay} ${quoteAsset}`;
+  } else if (accountSnapshot) {
+    freeCollateralValue = `${accountSnapshot.cashBalanceUsdDisplay} ${quoteAsset}`;
+  }
+
   return (
     <section className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-md border border-[#1B2430] bg-[#0F1720] xl:min-h-0">
       <div className="space-y-2 overflow-y-auto p-2.5 text-[11px]">
@@ -142,8 +168,8 @@ export function TradePanel({
             onClick={() => onSideChange("buy")}
             type="button"
           >
-            <span className="block font-semibold text-[#D1FAE5] text-sm">Long Convexity</span>
-            <span className="mt-0.5 block text-[#8CC9A3] text-[11px]">Long gamma. Benefits from larger moves.</span>
+            <span className="block font-semibold text-[#D1FAE5] text-sm">Long Volatility</span>
+            <span className="mt-0.5 block text-[#8CC9A3] text-[11px]">Benefits when implied volatility rises.</span>
           </button>
           <button
             className={cn(
@@ -153,14 +179,40 @@ export function TradePanel({
             onClick={() => onSideChange("sell")}
             type="button"
           >
-            <span className="block font-semibold text-[#FDE2E2] text-sm">Short Convexity</span>
-            <span className="mt-0.5 block text-[#D59C9C] text-[11px]">Short gamma. Benefits from realized stability.</span>
+            <span className="block font-semibold text-[#FDE2E2] text-sm">Short Volatility</span>
+            <span className="mt-0.5 block text-[#D59C9C] text-[11px]">Benefits when implied volatility falls.</span>
           </button>
+        </div>
+
+        <div
+          className="rounded-sm border border-[#1F3C55] bg-[#0E2233]/70 px-2 py-1.5 text-[#BFDBFE] text-[11px]"
+          title="Orders are matched using implied variance. The interface displays the equivalent 30-day implied volatility."
+        >
+          Submitted in variance, displayed in volatility
         </div>
 
         <div className="space-y-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
           <LabelValueRow label="Contract" value={contractLabel} />
-          <LabelValueRow label="Available Margin" value={`250,000 ${quoteAsset}`} />
+          <LabelValueRow
+            label="Cash Balance"
+            value={accountSnapshot ? `${accountSnapshot.cashBalanceUsdDisplay} ${quoteAsset}` : `-- ${quoteAsset}`}
+          />
+          <LabelValueRow
+            label="Free Collateral"
+            value={freeCollateralValue}
+          />
+          <LabelValueRow
+            label="Post-Trade IM"
+            value={riskSnapshot ? `${riskSnapshot.postTradeInitialMarginUsdDisplay} ${quoteAsset}` : `-- ${quoteAsset}`}
+          />
+          <LabelValueRow
+            label="Post-Trade Free"
+            value={riskSnapshot ? `${riskSnapshot.postTradeFreeCollateralUsdDisplay} ${quoteAsset}` : `-- ${quoteAsset}`}
+          />
+          <LabelValueRow
+            label="Matching Subaccount"
+            value={accountSnapshot ? `#${accountSnapshot.subaccountId}` : "--"}
+          />
           <LabelValueRow label="Settlement Wallet" value={settlementWallet} />
         </div>
 
@@ -216,12 +268,12 @@ export function TradePanel({
           </div>
         </div>
 
-        <ConvexityExposureCard baseAsset={baseAsset} metrics={exposureMetrics} />
+        <ConvexityExposureCard metrics={exposureMetrics} />
 
         <div className="space-y-2 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
           <div className="flex items-center justify-between">
             <div className="text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">Position Shape</div>
-            <span className="text-[#9CA3AF] text-[10px] uppercase tracking-[0.14em]">P&amp;L vs BTC</span>
+            <span className="text-[#9CA3AF] text-[10px] uppercase tracking-[0.14em]">P&amp;L vs Vol</span>
           </div>
           <PositionShapeSparkline metrics={exposureMetrics} />
         </div>
@@ -258,14 +310,14 @@ export function TradePanel({
               "w-full rounded-sm px-3 py-2 font-semibold text-sm transition-colors",
               tradeSide === "buy" && submissionEnabled && "bg-[#123524] text-[#D1FAE5]",
               tradeSide === "sell" && submissionEnabled && "bg-[#4D1717] text-[#FDE2E2]",
-              !submissionEnabled && "cursor-not-allowed bg-[#151B23] text-[#6B7280]",
+              (!submissionEnabled || submissionPending) &&
+                "cursor-not-allowed bg-[#151B23] text-[#6B7280]",
             )}
-            disabled={!submissionEnabled}
+            disabled={!submissionEnabled || submissionPending}
+            onClick={onSubmit}
             type="button"
           >
-            {submissionEnabled
-              ? `${tradeSide === "buy" ? "Long" : "Short"} Convexity`
-              : "Wallet Signing Required"}
+            {submitLabel}
           </button>
         </div>
 
@@ -278,15 +330,19 @@ export function TradePanel({
 
         <div className="space-y-1 rounded-sm border border-[#1B2430] bg-[#11161D] p-2">
           <div className="text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">Order Economics</div>
-          <LabelValueRow label="Mark" value={exposureMetrics.markPrice.toFixed(2)} />
-          <LabelValueRow label="Entry Reference" value={exposureMetrics.entryReferencePrice.toFixed(2)} />
+          <LabelValueRow label="Mark Vol" value={formatVolPercentFromVariance(exposureMetrics.markVariance)} />
+          <LabelValueRow label="Variance Mark" value={formatVariancePrice(exposureMetrics.markVariance)} />
+          <LabelValueRow label="Entry Vol" value={formatVolPercentFromVariance(exposureMetrics.entryReferencePrice)} />
+          <LabelValueRow label="Entry Variance" value={formatVariancePrice(exposureMetrics.entryReferencePrice)} />
           <LabelValueRow label="Settlement" value={quoteAsset} />
-          <LabelValueRow label="Delta Notional" value={`$${Math.round(exposureMetrics.deltaNotionalUsd).toLocaleString("en-US")}`} />
+          <LabelValueRow label="Vol Exposure" value={formatExposureUsd(exposureMetrics.volExposurePerPointUsd, "per +1 vol pt")} />
+          <LabelValueRow label="Variance Exposure" value={formatExposureUsd(exposureMetrics.varianceExposurePerPoint01Usd, "per +0.01 variance")} />
+          <LabelValueRow label="Funding Units" value={formatFundingVarianceBps(1)} />
           <LabelValueRow label="Break-even Move" value={`±${exposureMetrics.breakEvenMovePercent.toFixed(2)}%`} />
           <div className="flex items-center justify-between text-[11px]">
             <span className="inline-flex items-center gap-1 text-[#6B7280]">
               Gamma
-              <span title="Displayed as delta change in BTC for a 1% move in BTC spot.">
+              <span title="Advanced metric: displayed as delta change in BTC for a 1% move in BTC spot.">
                 <Info className="size-3" />
               </span>
             </span>

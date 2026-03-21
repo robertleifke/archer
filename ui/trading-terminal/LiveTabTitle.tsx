@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { formatVolPercentFromVariance } from "@/lib/btcvar30-display";
 
 export function LiveTabTitle({
   pair,
@@ -12,12 +13,17 @@ export function LiveTabTitle({
   const prevPriceRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const formatted =
-      price === null
-        ? "--"
-        : new Intl.NumberFormat("en-US", {
-            maximumFractionDigits: 2,
-          }).format(price);
+    let formatted = "--";
+
+    if (price !== null) {
+      if (pair === "BTCVAR30-PERP") {
+        formatted = formatVolPercentFromVariance(price);
+      } else {
+        formatted = new Intl.NumberFormat("en-US", {
+          maximumFractionDigits: 2,
+        }).format(price);
+      }
+    }
 
     let prefix = "";
 
@@ -29,7 +35,7 @@ export function LiveTabTitle({
       }
     }
 
-    document.title = `${prefix}$${formatted} ${pair} | Archer`;
+    document.title = `${prefix}${formatted} ${pair} | Archer`;
 
     prevPriceRef.current = price;
   }, [pair, price]);

@@ -57,6 +57,10 @@ alias ew := eslint-write
 @dev *args:
     bunx next dev --port 0 --turbopack {{ args }}
 
+[group("app")]
+@risk-service:
+    bun risk-service/server.ts
+
 # Build and start the Next.js app
 [group("app")]
 start: build

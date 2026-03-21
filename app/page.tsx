@@ -1,20 +1,17 @@
-import { getBtcSquaredPerpSnapshot } from "@/lib/btc-squared-market";
-import { getBtcSquaredOrderBook } from "@/lib/matching-backend";
-import { getNgnPerpSnapshot } from "@/lib/ngn-perp-market";
+import { getBtcConvexPerpSnapshot } from "@/lib/btc-convex-market";
+import { getBtcConvexOrderBook } from "@/lib/matching-backend";
 import { TradingTerminal } from "@/ui/trading-terminal/TradingTerminal";
 
 export default async function Home() {
-  const [initialBtcSnapshot, initialBtcOrderBook, initialNgnSnapshot] = await Promise.all([
-    getBtcSquaredPerpSnapshot().catch(() => null),
-    getBtcSquaredOrderBook().catch(() => null),
-    getNgnPerpSnapshot().catch(() => null),
+  const [initialBtcSnapshot, initialBtcOrderBook] = await Promise.all([
+    getBtcConvexPerpSnapshot().catch(() => null),
+    getBtcConvexOrderBook().catch(() => null),
   ]);
 
   return (
     <TradingTerminal
       initialBtcOrderBook={initialBtcOrderBook}
       initialBtcSnapshot={initialBtcSnapshot}
-      initialNgnSnapshot={initialNgnSnapshot}
     />
   );
 }

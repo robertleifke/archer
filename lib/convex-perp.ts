@@ -1,3 +1,8 @@
+import {
+  getBtcVar30ExposureDisplay,
+  varianceToVolPercent,
+  volPercentToVariance,
+} from "@/lib/btcvar30-display";
 import type {
   ConvexExposureMetrics,
   ConvexRiskModel,
@@ -176,8 +181,7 @@ export function getConvexPnlUsd(
   markPrice: number,
   side: "buy" | "sell",
 ) {
-  const signedPayoff =
-    convexNotionalUsd * getNormalizedSquaredPayoff(markPrice, entryReferencePrice);
+  const signedPayoff = convexNotionalUsd * (markPrice - entryReferencePrice);
 
   return side === "buy" ? signedPayoff : -signedPayoff;
 }
@@ -189,17 +193,31 @@ export function getConvexScenarioPnl(
   side: "buy" | "sell",
   estimatedFundingUsd8h: number,
 ) {
-  return [-0.05, 0, 0.05].map((move) => {
-    const scenarioMark = markPrice * (1 + move);
+  const markVolPercent = varianceToVolPercent(markPrice);
+  const volScenarios = [5, -5, 10, -10].map((volShift) => {
+    const scenarioVolPercent = Math.max(markVolPercent + volShift, 0);
+    const scenarioVariance = volPercentToVariance(scenarioVolPercent);
 
     return {
-      changeLabel: move === 0 ? "BTC unchanged" : `BTC ${move > 0 ? "+" : ""}${Math.round(move * 100)}%`,
+      changeLabel: `Vol ${volShift > 0 ? "+" : ""}${volShift} pts`,
+      displayValue: `${scenarioVolPercent.toFixed(2)}%`,
       pnlUsd:
-        getConvexPnlUsd(convexNotionalUsd, entryReferencePrice, scenarioMark, side) +
+        getConvexPnlUsd(convexNotionalUsd, entryReferencePrice, scenarioVariance, side) +
         estimatedFundingUsd8h,
-      spotPrice: roundTo(scenarioMark, 2),
+      spotPrice: roundTo(scenarioVariance, 4),
     };
   });
+
+  const unchangedScenario = {
+    changeLabel: "BTC unchanged",
+    displayValue: `${markVolPercent.toFixed(2)}%`,
+    pnlUsd:
+      getConvexPnlUsd(convexNotionalUsd, entryReferencePrice, markPrice, side) +
+      estimatedFundingUsd8h,
+    spotPrice: roundTo(markPrice, 4),
+  };
+
+  return [...volScenarios, unchangedScenario];
 }
 
 export function buildConvexExposureMetrics({
@@ -217,6 +235,19 @@ export function buildConvexExposureMetrics({
     sizingMode,
   });
   const estimatedFundingUsd8h = getEstimatedFundingUsd8h(convexNotionalUsd, side, 1);
+  const markVolPercent = varianceToVolPercent(markPrice);
+  const referenceVolPercent = varianceToVolPercent(referencePrice);
+  const currentPnlUsd = getConvexPnlUsd(convexNotionalUsd, entryReferencePrice, markPrice, side);
+  const nextVariancePointPnlUsd = getConvexPnlUsd(
+    convexNotionalUsd,
+    entryReferencePrice,
+    markPrice + 0.01,
+    side,
+  );
+  const exposureDisplay = getBtcVar30ExposureDisplay({
+    markVariance: markPrice,
+    varianceExposurePerPoint01Usd: nextVariancePointPnlUsd - currentPnlUsd,
+  });
 
   return {
     breakEvenMovePercent: getBreakEvenMovePercent(
@@ -239,8 +270,12 @@ export function buildConvexExposureMetrics({
     estimatedFundingUsd8h,
     gammaPer1PctMove: getGammaPer1PctMove(convexNotionalUsd, markPrice, referencePrice),
     gammaPer1kMove: getGammaPer1kMove(convexNotionalUsd, referencePrice),
+    markVariance: markPrice,
     markPrice,
-    pnlUsd: getConvexPnlUsd(convexNotionalUsd, entryReferencePrice, markPrice, side),
+    markVolPercent,
+    pnlUsd: currentPnlUsd,
+    referenceVariance: referencePrice,
+    referenceVolPercent,
     scenarioPnl: getConvexScenarioPnl(
       convexNotionalUsd,
       entryReferencePrice,
@@ -249,6 +284,8 @@ export function buildConvexExposureMetrics({
       estimatedFundingUsd8h,
     ),
     side,
+    varianceExposurePerPoint01Usd: exposureDisplay.varianceExposurePerPoint01Usd,
+    volExposurePerPointUsd: exposureDisplay.volExposurePerPointUsd,
   };
 }
 
@@ -359,8 +396,8 @@ export function generateNonlinearConvexOrderBook({
       (0.52 + levelNumber ** 1.18 * 0.3);
     const askSize = topLevelSize * askDepthBias;
     const bidSize = topLevelSize * bidDepthBias;
-    const askPrice = roundTo(midPrice * (1 + askDistanceBps / 10_000), 2);
-    const bidPrice = roundTo(midPrice * (1 - bidDistanceBps / 10_000), 2);
+    const askPrice = roundTo(midPrice * (1 + askDistanceBps / 10_000), 4);
+    const bidPrice = roundTo(midPrice * (1 - bidDistanceBps / 10_000), 4);
 
     askTotal += askSize;
     bidTotal += bidSize;

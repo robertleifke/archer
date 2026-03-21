@@ -1,6 +1,15 @@
 import { MoreHorizontal } from "lucide-react";
+import {
+  displayedVolSpread,
+  formatDisplayedVolSpread,
+  formatFundingVarianceBps,
+  formatVariancePrice,
+  formatVolPercentFromVariance,
+  getDisplaySpotSensitivityBtc,
+} from "@/lib/btcvar30-display";
 import type {
   ConvexRiskModel,
+  MarketSemantics,
   OrderBookDisplayMode,
   OrderBookLevel,
   TradePrint,
@@ -22,37 +31,46 @@ function formatDepth(value: number) {
   }).format(value);
 }
 
-function formatDisplayValue(level: OrderBookLevel, mode: OrderBookDisplayMode) {
+function formatDisplayValue(level: OrderBookLevel, mode: OrderBookDisplayMode, semantics?: MarketSemantics) {
   if (mode === "delta") {
-    return `${level.deltaEquivalent?.toFixed(2) ?? "0.00"} BTC`;
+    const spotSensitivity = getDisplaySpotSensitivityBtc(level.deltaEquivalent ?? Number.NaN);
+    return spotSensitivity === null ? "\u2014" : `${spotSensitivity.toFixed(2)} BTC`;
   }
 
   if (mode === "convex") {
     return `${level.gammaPer1PctMove?.toFixed(3) ?? "0.000"} BTC`;
   }
 
+  if (semantics?.priceSemantics === "variance" && semantics.displaySemantics === "volatility") {
+    return formatVolPercentFromVariance(level.price);
+  }
+
   return formatPrice(level.price);
 }
 
-function getDisplayLabel(mode: OrderBookDisplayMode) {
+function getDisplayLabel(mode: OrderBookDisplayMode, semantics?: MarketSemantics) {
   if (mode === "delta") {
-    return "Delta Eq";
+    return "Spot Sens";
   }
 
   if (mode === "convex") {
-    return "Gamma / level";
+    return "Gamma";
   }
 
-  return "Price";
+  return semantics?.displaySemantics === "volatility" ? "Vol" : "Price";
 }
 
-function getDisplaySubheader(mode: OrderBookDisplayMode) {
+function getDisplaySubheader(mode: OrderBookDisplayMode, semantics?: MarketSemantics) {
   if (mode === "convex") {
     return "BTC per 1% move";
   }
 
   if (mode === "delta") {
-    return "BTC equivalent";
+    return "BTC sensitivity";
+  }
+
+  if (semantics?.displaySemantics === "volatility") {
+    return "Displayed in vol %";
   }
 
   return "USDC";
@@ -62,11 +80,13 @@ function OrderRow({
   displayMode,
   level,
   maxTotal,
+  semantics,
   side,
 }: {
   displayMode: OrderBookDisplayMode;
   level: OrderBookLevel;
   maxTotal: number;
+  semantics?: MarketSemantics;
   side: "ask" | "bid";
 }) {
   const width = `${(level.total / maxTotal) * 100}%`;
@@ -86,7 +106,7 @@ function OrderRow({
           side === "ask" ? "text-[#D59C9C]" : "text-[#8CC9A3]",
         )}
       >
-        {formatDisplayValue(level, displayMode)}
+        {formatDisplayValue(level, displayMode, semantics)}
       </span>
       <span className="relative z-10 text-right font-medium text-[#D1D5DB]">
         {formatDepth(level.size)}
@@ -103,6 +123,7 @@ export function OrderBook({
   displayMode,
   nonlinearLadderLabel,
   riskModel,
+  semantics,
   trades,
   view,
   onDisplayModeChange,
@@ -114,6 +135,7 @@ export function OrderBook({
   displayMode: OrderBookDisplayMode;
   nonlinearLadderLabel?: string;
   riskModel?: ConvexRiskModel;
+  semantics?: MarketSemantics;
   trades: TradePrint[];
   view: "Order Book" | "Trades";
   onDisplayModeChange: (mode: OrderBookDisplayMode) => void;
@@ -124,8 +146,7 @@ export function OrderBook({
   const bestAsk = asks[0];
   const bestBid = bids[0];
   const spread = bestAsk && bestBid ? bestAsk.price - bestBid.price : null;
-  const spreadPercent =
-    spread !== null && bestBid && bestBid.price > 0 ? (spread / bestBid.price) * 100 : null;
+  const spreadVolPoints = bestAsk && bestBid ? displayedVolSpread(bestBid.price, bestAsk.price) : null;
 
   return (
     <section className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-md border border-[#1B2430] bg-[#0F1720] xl:min-h-0">
@@ -183,9 +204,9 @@ export function OrderBook({
 
       <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] border-[#1B2430] border-b px-2.5 py-1 text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">
         <div className="leading-tight">
-          <span>{getDisplayLabel(displayMode)}</span>
+          <span>{getDisplayLabel(displayMode, semantics)}</span>
           <div className="text-[#4B5563] text-[9px] normal-case tracking-[0.08em]">
-            {getDisplaySubheader(displayMode)}
+            {getDisplaySubheader(displayMode, semantics)}
           </div>
         </div>
         <span className="text-right">Depth</span>
@@ -195,8 +216,15 @@ export function OrderBook({
       {view === "Order Book" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="overflow-hidden">
-            {asks.map((level) => (
-              <OrderRow displayMode={displayMode} key={level.price} level={level} maxTotal={askMax} side="ask" />
+            {asks.map((level, index) => (
+              <OrderRow
+                displayMode={displayMode}
+                key={`ask-${level.price}-${level.size}-${index}`}
+                level={level}
+                maxTotal={askMax}
+                semantics={semantics}
+                side="ask"
+              />
             ))}
           </div>
 
@@ -205,10 +233,10 @@ export function OrderBook({
               <span className="font-medium text-[#6B7280] text-[10px] uppercase tracking-[0.14em]">Spread</span>
               <div className="flex items-center gap-2 text-[11px]">
                 <span className="font-semibold text-[#E5E7EB]">
-                  {spread === null ? "N/A" : formatPrice(spread)}
+                  {spreadVolPoints === null ? "N/A" : formatDisplayedVolSpread(bestBid.price, bestAsk.price)}
                 </span>
                 <span className="text-[#60A5FA]">
-                  {spreadPercent === null ? "Waiting" : `${spreadPercent.toFixed(3)}%`}
+                  {spread === null ? "Waiting" : `${formatVariancePrice(spread)} variance`}
                 </span>
               </div>
             </div>
@@ -222,7 +250,7 @@ export function OrderBook({
                   Inv skew <span className="text-[#D1D5DB]">{riskModel.inventorySkew.toFixed(2)}</span>
                 </span>
                 <span className="text-[#6B7280]">
-                  Funding <span className="text-[#D1D5DB]">{riskModel.fundingRateBps.toFixed(2)} bps</span>
+                  Funding <span className="text-[#D1D5DB]">{formatFundingVarianceBps(riskModel.fundingRateBps).replace("Funding (variance): ", "")}</span>
                 </span>
                 <span className="text-right text-[#6B7280]">
                   Top size <span className="text-[#D1D5DB]">{riskModel.topLevelSizeFactor.toFixed(2)}x</span>
@@ -231,15 +259,22 @@ export function OrderBook({
                   Gamma regime <span className="text-[#D1D5DB]">{riskModel.convexityRisk.toFixed(2)}</span>
                 </span>
                 <span className="text-right text-[#6B7280]">
-                  Ladder <span className="text-[#D1D5DB]">{displayMode === "price" ? "Price" : getDisplayLabel(displayMode)}</span>
+                  Ladder <span className="text-[#D1D5DB]">{getDisplayLabel(displayMode, semantics)}</span>
                 </span>
               </div>
             ) : null}
           </div>
 
           <div className="overflow-hidden">
-            {bids.map((level) => (
-              <OrderRow displayMode={displayMode} key={level.price} level={level} maxTotal={bidMax} side="bid" />
+            {bids.map((level, index) => (
+              <OrderRow
+                displayMode={displayMode}
+                key={`bid-${level.price}-${level.size}-${index}`}
+                level={level}
+                maxTotal={bidMax}
+                semantics={semantics}
+                side="bid"
+              />
             ))}
           </div>
 
@@ -254,7 +289,7 @@ export function OrderBook({
           {trades.map((trade) => (
             <div className="grid grid-cols-3 px-2.5 py-1 text-[11px]" key={`${trade.time}-${trade.price}`}>
               <span className={cn("font-semibold", trade.side === "buy" ? "text-[#8CC9A3]" : "text-[#D59C9C]")}>
-                {formatPrice(trade.price)}
+                {semantics?.displaySemantics === "volatility" ? formatVolPercentFromVariance(trade.price) : formatPrice(trade.price)}
               </span>
               <span className="text-right text-[#D1D5DB]">{formatDepth(trade.size)}</span>
               <span className="text-right text-[#9CA3AF]">{trade.time}</span>

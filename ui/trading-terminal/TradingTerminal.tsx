@@ -1,7 +1,20 @@
 "use client";
 
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { toViemAccount, usePrivy, useWallets } from "@privy-io/react-auth";
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
+import {
+  formatExposureUsd,
+  formatFundingVarianceBps,
+  formatVariancePrice,
+  formatVolPercentFromVariance,
+  getDisplaySpotSensitivityBtc,
+  getBtcVar30DisplayFields,
+  getBtcVar30Semantics,
+  normalizeEnginePriceToVariance,
+  formatDisplayedVolSpread,
+  varianceToVolPercent,
+  volPercentToVariance,
+} from "@/lib/btcvar30-display";
 import {
   buildConvexExposureMetrics,
   deriveExternalImbalance,
@@ -11,15 +24,21 @@ import type { CHART_CONTEXT_TABS, CHART_RANGE_BUTTONS, TIMEFRAME_OPTIONS } from 
 import type { ACTIVITY_VIEWS } from "@/lib/mock-trading-data";
 import type { CONTRACT_LABELS } from "@/lib/mock-trading-data";
 import type {
-  BtcSquaredPerpSnapshot,
+  BtcConvexAccountSnapshot,
+  BtcConvexRiskSnapshot,
+  BtcConvexPerpSnapshot,
   Candle,
+  ChartDisplayMode,
+  ConvexPerpOrderCancellation,
+  ConvexPerpOrderSubmission,
   ConvexExposureMetrics,
   ConvexSizingMode,
   DeliveryTerm,
+  ManagedConvexOrder,
   MarketStat,
   MatchingBackendOrderBookSnapshot,
-  NgnPerpSnapshot,
   OrderBookDisplayMode,
+  PreparedConvexPerpOrder,
 } from "@/lib/trading.types";
 import {
   CHART_TOOLS,
@@ -32,6 +51,7 @@ import {
   DEFAULT_SYMBOL,
   DEFAULT_TIMEFRAME,
   FILTER_OPTIONS,
+  getBaseSpotCandles,
   INSTRUMENT_MARKETS,
   MARKET_OPTIONS,
 } from "@/lib/mock-trading-data";
@@ -44,17 +64,6 @@ import { PositionShapeSparkline } from "@/ui/trading-terminal/PositionShapeSpark
 import { TradePanel } from "@/ui/trading-terminal/TradePanel";
 
 const DISPLAY_NUMBER_PATTERN = /-?\d+(\.\d+)?/;
-
-function formatPrice(value: number, digits = 2) {
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: digits,
-    minimumFractionDigits: digits,
-  }).format(value);
-}
-
-function parseNumericString(value: string) {
-  return Number(value.replaceAll(",", "").replaceAll("$", "").replaceAll("+", ""));
-}
 
 function parseDisplayNumber(value: string) {
   const match = value.replaceAll(",", "").match(DISPLAY_NUMBER_PATTERN);
@@ -79,26 +88,55 @@ function shiftCandles(
 
 function buildActivityViews(
   ticker: string,
-  orderPreviewMetrics: ConvexExposureMetrics,
+  managedOrders: ManagedConvexOrder[],
   positionMetrics: ConvexExposureMetrics,
+  onAmendOrder: (order: ManagedConvexOrder) => void,
+  onCancelOrder: (order: ManagedConvexOrder) => void,
 ) {
-  return {
-    "open-orders": {
-      columns: ["Instrument", "Bias", "Mode", "Delta Eq", "Entry Ref"],
-      rows: [
-        {
+  const openOrderRows =
+    managedOrders.length > 0
+      ? managedOrders.map((order) => ({
           cells: [
             ticker,
-            "Long Convexity",
-            "Notional",
-            `${orderPreviewMetrics.deltaEquivalentBtc.toFixed(2)} BTC`,
-            orderPreviewMetrics.entryReferencePrice.toFixed(2),
+            order.side === "buy" ? "Long Volatility" : "Short Volatility",
+            `${order.sizeBtc} BTC`,
+            formatVolPercentFromVariance(order.limitPriceVariance),
+            new Date(order.submittedAt).toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            }),
+            <div className="flex items-center gap-2" key={`${order.orderId}-actions`}>
+              <button
+                className="rounded-sm border border-[#1B2430] px-2 py-1 text-[#FCA5A5] transition-colors hover:border-[#7F1D1D] hover:bg-[#3F1717]"
+                onClick={() => onCancelOrder(order)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-sm border border-[#1B2430] px-2 py-1 text-[#BFDBFE] transition-colors hover:border-[#1D4ED8] hover:bg-[#13233C]"
+                onClick={() => onAmendOrder(order)}
+                type="button"
+              >
+                Amend
+              </button>
+            </div>,
           ],
-        },
-      ],
+        }))
+      : [
+          {
+            cells: [ticker, "No active volatility orders", "-", "-", "-", "-"],
+          },
+        ];
+
+  return {
+    "open-orders": {
+      columns: ["Instrument", "Bias", "Size", "Limit", "Submitted", "Actions"],
+      rows: openOrderRows,
     },
     positions: {
-      columns: ["Instrument", "Entry Ref", "Delta Eq", "Gamma", "Mark", "PnL"],
+      columns: ["Instrument", "Entry Vol", "Vol Exposure", "Mark Vol", "PnL"],
       rows: [
         {
           cells: [
@@ -106,21 +144,20 @@ function buildActivityViews(
               <PositionShapeSparkline compact interactive metrics={positionMetrics} />
               <span>{ticker}</span>
             </div>,
-            positionMetrics.entryReferencePrice.toFixed(2),
-            `${positionMetrics.deltaEquivalentBtc.toFixed(2)} BTC`,
-            `${positionMetrics.gammaPer1PctMove.toFixed(3)} BTC / 1%`,
-            positionMetrics.markPrice.toFixed(2),
+            formatVolPercentFromVariance(positionMetrics.entryReferencePrice),
+            formatExposureUsd(positionMetrics.volExposurePerPointUsd, "/ +1 pt"),
+            formatVolPercentFromVariance(positionMetrics.markVariance),
             `${positionMetrics.pnlUsd >= 0 ? "+" : "-"}$${Math.abs(positionMetrics.pnlUsd).toFixed(0)}`,
           ],
-          positiveCellIndexes: [5],
+          positiveCellIndexes: [4],
         },
       ],
     },
     "trade-history": {
-      columns: ["Time", "Instrument", "Bias", "Delta Eq", "Price"],
+      columns: ["Time", "Instrument", "Bias", "Price", "Spread"],
       rows: [
-        { cells: ["10:08:14", ticker, "Long Convexity", "1.52 BTC", positionMetrics.markPrice.toFixed(2)] },
-        { cells: ["10:08:06", ticker, "Short Convexity", "0.94 BTC", positionMetrics.entryReferencePrice.toFixed(2)] },
+        { cells: ["10:08:14", ticker, "Long Volatility", formatVolPercentFromVariance(positionMetrics.markVariance), formatDisplayedVolSpread(positionMetrics.entryReferencePrice, positionMetrics.markVariance)] },
+        { cells: ["10:08:06", ticker, "Short Volatility", formatVolPercentFromVariance(positionMetrics.entryReferencePrice), formatDisplayedVolSpread(positionMetrics.entryReferencePrice * 0.998, positionMetrics.entryReferencePrice)] },
       ],
     },
   };
@@ -133,15 +170,241 @@ function buildTradeStatus(
 ) {
   const action = side === "buy" ? "Long" : "Short";
 
-  return `${action} convexity ${exposureMetrics.deltaEquivalentBtc.toFixed(2)} BTC delta eq, gamma ${exposureMetrics.gammaPer1PctMove.toFixed(3)} BTC per 1% on ${ticker}`;
+  return `${action} volatility ${formatVolPercentFromVariance(exposureMetrics.markVariance)} mark, ${formatExposureUsd(exposureMetrics.volExposurePerPointUsd, "per +1 vol pt")} on ${ticker}`;
 }
 
-function getIndexDigits(_symbol: string) {
-  return 2;
+function getTradeSubmissionState({
+  riskSnapshot,
+  isBtcConvexMarket,
+  orderType,
+  parsedSize,
+  submissionPending,
+  tradeSide,
+  walletConnected,
+}: {
+  riskSnapshot: BtcConvexRiskSnapshot | null;
+  isBtcConvexMarket: boolean;
+  orderType: "Limit" | "Market" | "Stop";
+  parsedSize: number;
+  submissionPending: boolean;
+  tradeSide: "buy" | "sell";
+  walletConnected: boolean;
+}) {
+  const exceedsAvailableCash = riskSnapshot !== null && !riskSnapshot.orderAllowed;
+  const tradeSubmissionEnabled =
+    isBtcConvexMarket &&
+    walletConnected &&
+    orderType === "Market" &&
+    Number.isFinite(parsedSize) &&
+    parsedSize > 0 &&
+    riskSnapshot !== null &&
+    !exceedsAvailableCash &&
+    !submissionPending;
+  let tradeSubmissionNotice = "Order entry is still using static terminal data for this market.";
+  let submitLabel = walletConnected ? "Market Order Required" : "Wallet Signing Required";
+
+  if (!isBtcConvexMarket) {
+    return { submitLabel, tradeSubmissionEnabled, tradeSubmissionNotice };
+  }
+
+  if (!walletConnected) {
+    tradeSubmissionNotice =
+      "Connect a wallet to sign BTCVAR30 variance-native orders. Live depth continues to come from the matching backend.";
+
+    return { submitLabel, tradeSubmissionEnabled, tradeSubmissionNotice };
+  }
+
+  if (orderType !== "Market") {
+    tradeSubmissionNotice =
+      "BTCVAR30 submission currently supports market orders only. Archer converts them into aggressive variance-native limit orders for the matching backend.";
+
+    return { submitLabel, tradeSubmissionEnabled, tradeSubmissionNotice };
+  }
+
+  if (!Number.isFinite(parsedSize) || parsedSize <= 0) {
+    tradeSubmissionNotice = "Enter a non-zero BTCVAR30 size before submitting.";
+    submitLabel = "Enter Valid Size";
+
+    return { submitLabel, tradeSubmissionEnabled, tradeSubmissionNotice };
+  }
+
+  if (riskSnapshot === null) {
+    tradeSubmissionNotice = "Loading risk preview from the convex risk service.";
+    submitLabel = "Loading Risk";
+
+    return { submitLabel, tradeSubmissionEnabled, tradeSubmissionNotice };
+  }
+
+  if (exceedsAvailableCash) {
+    tradeSubmissionNotice = `Post-Trade Initial Margin: $${riskSnapshot.postTradeInitialMarginUsdDisplay}. Post-Trade Free Collateral: $${riskSnapshot.postTradeFreeCollateralUsdDisplay}. Model: ${riskSnapshot.marginModel}.`;
+    submitLabel = "Insufficient Collateral";
+
+    return { submitLabel, tradeSubmissionEnabled, tradeSubmissionNotice };
+  }
+
+  if (submissionPending) {
+    return {
+      submitLabel: "Submitting Volatility Order...",
+      tradeSubmissionEnabled,
+      tradeSubmissionNotice: "Waiting for your wallet signature and backend acknowledgement.",
+    };
+  }
+
+  return {
+    submitLabel: `${tradeSide === "buy" ? "Long" : "Short"} Volatility`,
+    tradeSubmissionEnabled,
+    tradeSubmissionNotice:
+      "Wallet connected. Archer prepares an aggressive variance-native limit order, signs the Matching action locally, and forwards the exact backend payload.",
+  };
 }
 
-function getPricePrecision(symbol: string) {
-  return symbol === "BTC/USD" ? 0 : 2;
+async function submitSignedConvexOrder({
+  deltaEquivalentBtc,
+  markVariance,
+  selectedWallet,
+  tradeSide,
+}: {
+  deltaEquivalentBtc: number;
+  markVariance: number;
+  selectedWallet: Awaited<ReturnType<typeof useWallets>>["wallets"][number];
+  tradeSide: "buy" | "sell";
+}): Promise<ManagedConvexOrder> {
+  const prepareResponse = await fetch("/api/markets/btcusdc-cvxperp/orders/prepare", {
+    body: JSON.stringify({
+      markPrice: markVariance.toFixed(4),
+      ownerAddress: selectedWallet.address,
+      side: tradeSide,
+      sizeBtc: Math.abs(deltaEquivalentBtc).toFixed(8),
+    }),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  const preparedPayload = (await prepareResponse.json()) as
+    | PreparedConvexPerpOrder
+    | { error?: string };
+
+  if (!prepareResponse.ok) {
+    throw new Error(
+      "error" in preparedPayload
+        ? (preparedPayload.error ?? "BTCVAR30 order preparation failed")
+        : "BTCVAR30 order preparation failed",
+    );
+  }
+
+  const preparedOrder = preparedPayload as PreparedConvexPerpOrder;
+  const signature = await signConvexTypedData({
+    preparedOrder,
+    selectedWallet,
+  });
+  const unsignedOrder = {
+    ...preparedOrder.order,
+    signature,
+  };
+  const response = await fetch("/api/markets/btcusdc-cvxperp/orders", {
+    body: JSON.stringify(unsignedOrder),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  const payload = (await response.json()) as ConvexPerpOrderSubmission | { error?: string };
+
+  if (!response.ok) {
+    throw new Error(
+      "error" in payload
+        ? (payload.error ?? "BTCVAR30 order submission failed")
+        : "BTCVAR30 order submission failed",
+    );
+  }
+
+  return {
+    limitPriceVariance: Number(preparedOrder.limitPriceDisplay),
+    nonce: unsignedOrder.nonce,
+    orderId: unsignedOrder.order_id,
+    ownerAddress: unsignedOrder.owner_address,
+    side: tradeSide,
+    sizeBtc: Math.abs(deltaEquivalentBtc).toFixed(8),
+    submittedAt: new Date().toISOString(),
+  };
+}
+
+function useBtcConvexMarketData({
+  initialBtcOrderBook,
+  initialBtcSnapshot,
+  selectedSymbol,
+}: {
+  initialBtcOrderBook: MatchingBackendOrderBookSnapshot | null;
+  initialBtcSnapshot: BtcConvexPerpSnapshot | null;
+  selectedSymbol: keyof typeof INSTRUMENT_MARKETS;
+}) {
+  const [btcOrderBook, setBtcOrderBook] = useState<MatchingBackendOrderBookSnapshot | null>(
+    initialBtcOrderBook,
+  );
+  const [btcSnapshot, setBtcSnapshot] = useState<BtcConvexPerpSnapshot | null>(initialBtcSnapshot);
+
+  const refreshBtcConvexMarket = useEffectEvent(async function refreshBtcConvexMarket() {
+    try {
+      const response = await fetch("/api/markets/btcusdc-cvxperp", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      setBtcSnapshot((await response.json()) as BtcConvexPerpSnapshot);
+    } catch {
+      // Keep the last good snapshot and let the rest of the UI continue rendering.
+    }
+  });
+
+  const refreshBtcConvexOrderBook = useEffectEvent(async function refreshBtcConvexOrderBook() {
+    try {
+      const response = await fetch("/api/markets/btcusdc-cvxperp/book", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      setBtcOrderBook((await response.json()) as MatchingBackendOrderBookSnapshot);
+    } catch {
+      // Keep the last good snapshot and let the rest of the UI continue rendering.
+    }
+  });
+
+  useEffect(() => {
+    if (selectedSymbol !== "BTC/USD") {
+      return;
+    }
+
+    void refreshBtcConvexMarket();
+    void refreshBtcConvexOrderBook();
+
+    const intervalId = window.setInterval(() => {
+      void refreshBtcConvexMarket();
+      void refreshBtcConvexOrderBook();
+    }, BTC_MARKET_POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [selectedSymbol]);
+
+  return { btcOrderBook, btcSnapshot };
+}
+
+function getPricePrecision(chartContext: ChartDisplayMode) {
+  if (chartContext === "Vol") {
+    return 2;
+  }
+
+  if (chartContext === "Variance") {
+    return 4;
+  }
+
+  return 0;
 }
 
 function getBaseAsset(symbol: string) {
@@ -153,15 +416,8 @@ function getBaseAsset(symbol: string) {
 }
 
 function getInstrumentKeyFromMarketId(marketId: string): keyof typeof INSTRUMENT_MARKETS {
-  if (marketId.startsWith("btc-")) {
-    return "BTC/USD";
-  }
-
-  if (marketId.startsWith("ngn-")) {
-    return "NGN/USD";
-  }
-
-  return "ETH/USD";
+  void marketId;
+  return "BTC/USD";
 }
 
 function getChartUpdateInterval(timeframe: (typeof TIMEFRAME_OPTIONS)[number]) {
@@ -177,17 +433,33 @@ function getChartUpdateInterval(timeframe: (typeof TIMEFRAME_OPTIONS)[number]) {
 }
 
 function getDisplayCandles(
-  chartContext: (typeof CHART_CONTEXT_TABS)[number],
-  liveMark: number,
-  liveBasis: number,
+  chartContext: ChartDisplayMode,
+  liveMarkVariance: number,
   marketCandles: Candle[],
-  _liveIndex: number,
+  _liveIndexVariance: number,
 ) {
-  if (chartContext === "Basis") {
-    return shiftCandles(marketCandles, liveBasis);
+  if (chartContext === "Variance") {
+    return marketCandles.map((candle) => ({
+      ...candle,
+      close: volPercentToVariance(candle.close),
+      high: volPercentToVariance(candle.high),
+      low: volPercentToVariance(candle.low),
+      open: volPercentToVariance(candle.open),
+    }));
   }
 
-  return shiftCandles(marketCandles, liveMark);
+  if (chartContext === "BTC Spot") {
+    return getBaseSpotCandles().map(([open, high, low, close, volume], index) => ({
+      close,
+      high,
+      low,
+      open,
+      time: marketCandles[index]?.time ?? `${String((index + 8) % 24).padStart(2, "0")}:00`,
+      volume,
+    }));
+  }
+
+  return shiftCandles(marketCandles, varianceToVolPercent(liveMarkVariance));
 }
 
 function getNextCandleTimeLabel(currentLabel: string) {
@@ -209,7 +481,7 @@ function getNextCandleTimeLabel(currentLabel: string) {
 
 function simulateLiveCandles(
   candles: Candle[],
-  symbol: string,
+  chartContext: ChartDisplayMode,
   timeframe: (typeof TIMEFRAME_OPTIONS)[number],
 ) {
   const lastCandle = candles.at(-1);
@@ -218,7 +490,7 @@ function simulateLiveCandles(
     return candles;
   }
 
-  const precision = getPricePrecision(symbol);
+  const precision = getPricePrecision(chartContext);
   let timeframeScale = 1;
 
   if (timeframe === "5m") {
@@ -227,8 +499,14 @@ function simulateLiveCandles(
     timeframeScale = 1.8;
   }
 
-  const drift = (symbol === "BTC/USD" ? 42 : 3.8) * timeframeScale;
-  const volatility = (symbol === "BTC/USD" ? 88 : 11.5) * timeframeScale;
+  const drift = chartContext === "BTC Spot" ? 42 * timeframeScale : 0.12 * timeframeScale;
+  let volatility = 0.55 * timeframeScale;
+
+  if (chartContext === "BTC Spot") {
+    volatility = 88 * timeframeScale;
+  } else if (chartContext === "Variance") {
+    volatility = 0.004 * timeframeScale;
+  }
   const directionalBias = Math.random() > 0.5 ? drift : -drift;
   const delta = directionalBias + (Math.random() - 0.5) * volatility;
   const nextClose = Number((lastCandle.close + delta).toFixed(precision));
@@ -272,14 +550,31 @@ function simulateLiveCandles(
 
 function buildLiveInfoBar(
   infoBar: MarketStat[],
-  _marketType: "Futures",
-  symbol: string,
-  liveBasis: number,
-  liveIndex: number,
+  liveIndexVariance: number,
+  liveMarkVariance: number,
 ) {
+  const display = getBtcVar30DisplayFields({
+    indexValue: liveIndexVariance,
+    indexValueSource: "variance",
+    markValue: liveMarkVariance,
+    markValueSource: "variance",
+  });
+
   return infoBar.map((item: MarketStat) => {
-    if (item.label === "Mark Price") {
-      return { ...item, value: formatPrice(liveIndex + liveBasis, getIndexDigits(symbol)) };
+    if (item.label === "Mark Vol") {
+      return { ...item, value: display.displayMarkVol };
+    }
+
+    if (item.label === "Variance Mark") {
+      return { ...item, value: formatVariancePrice(liveMarkVariance) };
+    }
+
+    if (item.label === "24h Change") {
+      return { ...item, value: `${display.changePercent >= 0 ? "+" : ""}${display.changePercent.toFixed(2)}%` };
+    }
+
+    if (item.label === "Funding (variance)") {
+      return { ...item, value: formatFundingVarianceBps(1).replace("Funding (variance): ", "") };
     }
 
     return item;
@@ -291,13 +586,19 @@ function getDeliveryValue(positionOverview: DeliveryTerm[], label: string) {
 }
 
 function buildPositionOverview(positionMetrics: ConvexExposureMetrics) {
+  const spotSensitivityBtc = getDisplaySpotSensitivityBtc(positionMetrics.deltaEquivalentBtc);
+
   return [
-    { label: "Entry Reference", value: positionMetrics.entryReferencePrice.toFixed(2) },
-    { label: "Delta Notional", value: `$${Math.round(positionMetrics.deltaNotionalUsd).toLocaleString("en-US")}` },
-    { label: "Delta Equivalent", value: `${positionMetrics.deltaEquivalentBtc.toFixed(2)} BTC` },
-    { label: "Gamma", value: `${positionMetrics.gammaPer1PctMove.toFixed(3)} BTC / 1%` },
+    { label: "Entry Vol", value: formatVolPercentFromVariance(positionMetrics.entryReferencePrice) },
+    { label: "Variance Entry", value: formatVariancePrice(positionMetrics.entryReferencePrice) },
+    { label: "Vol Exposure", value: formatExposureUsd(positionMetrics.volExposurePerPointUsd, "per +1 vol pt") },
+    { label: "Variance Exposure", value: formatExposureUsd(positionMetrics.varianceExposurePerPoint01Usd, "per +0.01 variance") },
+    ...(spotSensitivityBtc === null
+      ? []
+      : [{ label: "Spot Sensitivity (BTC)", value: `${spotSensitivityBtc.toFixed(2)} BTC` }]),
+    { label: "Funding (variance)", value: `${formatFundingVarianceBps(1).replace("Funding (variance): ", "")} / 8h` },
     { label: "Break-even Move", value: `±${positionMetrics.breakEvenMovePercent.toFixed(2)}%` },
-    { label: "Mark Price", value: positionMetrics.markPrice.toFixed(2) },
+    { label: "Mark Vol", value: formatVolPercentFromVariance(positionMetrics.markVariance) },
     { label: "Unrealized PnL", value: `${positionMetrics.pnlUsd >= 0 ? "+" : "-"}$${Math.abs(positionMetrics.pnlUsd).toFixed(0)}` },
   ] satisfies DeliveryTerm[];
 }
@@ -305,23 +606,18 @@ function buildPositionOverview(positionMetrics: ConvexExposureMetrics) {
 function resolveLiveMarketPrices({
   btcSnapshot,
   market,
-  ngnSnapshot,
   selectedSymbol,
 }: {
-  btcSnapshot: BtcSquaredPerpSnapshot | null;
+  btcSnapshot: BtcConvexPerpSnapshot | null;
   market: (typeof INSTRUMENT_MARKETS)[keyof typeof INSTRUMENT_MARKETS][keyof (typeof INSTRUMENT_MARKETS)[keyof typeof INSTRUMENT_MARKETS]];
-  ngnSnapshot: NgnPerpSnapshot | null;
   selectedSymbol: keyof typeof INSTRUMENT_MARKETS;
 }) {
-  let liveIndex = parseNumericString(market.index);
-  let liveMark = parseNumericString(market.mark);
+  let liveIndex = volPercentToVariance(parseDisplayNumber(market.index));
+  let liveMark = volPercentToVariance(parseDisplayNumber(market.mark));
 
   if (selectedSymbol === "BTC/USD" && btcSnapshot !== null) {
-    liveIndex = btcSnapshot.displayIndexBtcUsd;
-    liveMark = btcSnapshot.displayMarkBtcUsd;
-  } else if (selectedSymbol === "NGN/USD" && ngnSnapshot !== null) {
-    liveIndex = ngnSnapshot.displayIndexNgnPerUsd;
-    liveMark = ngnSnapshot.displayMarkNgnPerUsd;
+    liveIndex = btcSnapshot.indexVariance;
+    liveMark = btcSnapshot.markVariance;
   }
 
   return { liveIndex, liveMark };
@@ -329,23 +625,16 @@ function resolveLiveMarketPrices({
 
 function buildDynamicMarketOptions({
   btcSnapshot,
-  ngnSnapshot,
 }: {
-  btcSnapshot: BtcSquaredPerpSnapshot | null;
-  ngnSnapshot: NgnPerpSnapshot | null;
+  btcSnapshot: BtcConvexPerpSnapshot | null;
 }) {
   return MARKET_OPTIONS.map((marketOption) => {
-    if (marketOption.id === "btc-usd-futures" && btcSnapshot !== null) {
+    if (marketOption.id === "btc-var-30-perp" && btcSnapshot !== null) {
       return {
         ...marketOption,
-        lastPrice: formatPrice(btcSnapshot.displayMarkBtcUsd, 2),
-      };
-    }
-
-    if (marketOption.id === "ngn-usdc-perp-futures" && ngnSnapshot !== null) {
-      return {
-        ...marketOption,
-        lastPrice: formatPrice(ngnSnapshot.displayMarkNgnPerUsd, 2),
+        displayName: btcSnapshot.display_name,
+        lastPrice: formatVolPercentFromVariance(btcSnapshot.markVariance),
+        semantics: getBtcVar30Semantics(),
       };
     }
 
@@ -357,7 +646,6 @@ function buildTerminalViewModel({
   btcOrderBook,
   btcSnapshot,
   market,
-  ngnSnapshot,
   selectedMarketId,
   selectedSymbol,
   size,
@@ -365,35 +653,32 @@ function buildTerminalViewModel({
   tradeSide,
 }: {
   btcOrderBook: MatchingBackendOrderBookSnapshot | null;
-  btcSnapshot: BtcSquaredPerpSnapshot | null;
+  btcSnapshot: BtcConvexPerpSnapshot | null;
   market: (typeof INSTRUMENT_MARKETS)[keyof typeof INSTRUMENT_MARKETS][keyof (typeof INSTRUMENT_MARKETS)[keyof typeof INSTRUMENT_MARKETS]];
-  ngnSnapshot: NgnPerpSnapshot | null;
   selectedMarketId: string;
   selectedSymbol: keyof typeof INSTRUMENT_MARKETS;
   size: string;
   sizingMode: ConvexSizingMode;
   tradeSide: "buy" | "sell";
 }) {
-  const selectedMarket =
-    MARKET_OPTIONS.find((marketOption) => marketOption.id === selectedMarketId) ??
-    MARKET_OPTIONS[0];
-  const isBtcSquaredMarket = selectedMarketId === "btc-usd-futures";
-  const liveBtcOrderBook = isBtcSquaredMarket && btcOrderBook !== null;
+  const isBtcConvexMarket = selectedMarketId === "btc-var-30-perp";
+  const liveBtcOrderBook = isBtcConvexMarket && btcOrderBook !== null;
   const { liveIndex, liveMark } = resolveLiveMarketPrices({
     btcSnapshot,
     market,
-    ngnSnapshot,
     selectedSymbol,
   });
   const dynamicMarketOptions = buildDynamicMarketOptions({
     btcSnapshot,
-    ngnSnapshot,
   });
+  const selectedMarket =
+    dynamicMarketOptions.find((marketOption) => marketOption.id === selectedMarketId) ??
+    dynamicMarketOptions[0];
   const positionEntryReference = parseDisplayNumber(
-    getDeliveryValue(market.positionOverview, "Entry Reference"),
+    getDeliveryValue(market.positionOverview, "Variance Entry"),
   );
   const positionConvexNotional = parseDisplayNumber(
-    getDeliveryValue(market.positionOverview, "Convex Notional"),
+    getDeliveryValue(market.positionOverview, "Variance Notional"),
   );
   const currentPositionMetrics = buildConvexExposureMetrics({
     entryReferencePrice: positionEntryReference || liveIndex,
@@ -437,7 +722,7 @@ function buildTerminalViewModel({
     displayOrderBook,
     dynamicMarketOptions,
     dynamicPositionOverview: buildPositionOverview(currentPositionMetrics),
-    isBtcSquaredMarket,
+    isBtcConvexMarket,
     liveIndex,
     liveMark,
     orderPreviewMetrics,
@@ -447,20 +732,245 @@ function buildTerminalViewModel({
 
 type SelectedContract = (typeof CONTRACT_LABELS)[number];
 const BTC_MARKET_POLL_INTERVAL_MS = 5000;
-const NGN_MARKET_POLL_INTERVAL_MS = 30_000;
+const BASE_CHAIN_HEX = "0x2105";
+
+function getChainMismatchMessage(chainId: number) {
+  return `Switch your wallet to Base (${chainId}) before signing the BTCVAR30 order.`;
+}
+
+function buildConvexTypedDataForSigning(preparedOrder: PreparedConvexPerpOrder) {
+  return {
+    ...preparedOrder.typedData,
+    domain: {
+      ...preparedOrder.typedData.domain,
+      chainId: BigInt(preparedOrder.typedData.domain.chainId),
+    },
+    message: {
+      ...preparedOrder.typedData.message,
+      expiry: BigInt(preparedOrder.typedData.message.expiry),
+      nonce: BigInt(preparedOrder.typedData.message.nonce),
+      subaccountId: BigInt(preparedOrder.typedData.message.subaccountId),
+    },
+  };
+}
+
+function buildConvexTypedDataForProvider(preparedOrder: PreparedConvexPerpOrder) {
+  return {
+    ...preparedOrder.typedData,
+    domain: {
+      ...preparedOrder.typedData.domain,
+      chainId: preparedOrder.typedData.domain.chainId,
+    },
+    message: {
+      ...preparedOrder.typedData.message,
+      expiry: preparedOrder.typedData.message.expiry,
+      nonce: preparedOrder.typedData.message.nonce,
+      subaccountId: preparedOrder.typedData.message.subaccountId,
+    },
+  };
+}
+
+function isEmbeddedWallet(wallet: Awaited<ReturnType<typeof useWallets>>["wallets"][number]) {
+  const connectorType = (wallet as { connectorType?: string }).connectorType;
+
+  return connectorType === "embedded" || connectorType === "embedded_imported";
+}
+
+function getWalletConnectorType(wallet: Awaited<ReturnType<typeof useWallets>>["wallets"][number]) {
+  return (wallet as { connectorType?: string }).connectorType ?? null;
+}
+
+async function ensureWalletChain(provider: { request(args: { method: string; params?: unknown[] }): Promise<unknown> }, chainId: number) {
+  const currentChainId = (await provider.request({
+    method: "eth_chainId",
+  })) as string;
+
+  if (Number.parseInt(currentChainId, 16) === chainId) {
+    return;
+  }
+
+  try {
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: BASE_CHAIN_HEX }],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (!message.includes("4902")) {
+      throw new Error(getChainMismatchMessage(chainId));
+    }
+
+    await provider.request({
+      method: "wallet_addEthereumChain",
+      params: [
+        {
+          blockExplorerUrls: ["https://basescan.org"],
+          chainId: BASE_CHAIN_HEX,
+          chainName: "Base",
+          nativeCurrency: {
+            decimals: 18,
+            name: "Ether",
+            symbol: "ETH",
+          },
+          rpcUrls: ["https://mainnet.base.org"],
+        },
+      ],
+    });
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: BASE_CHAIN_HEX }],
+    });
+  }
+}
+
+async function signConvexTypedData({
+  preparedOrder,
+  selectedWallet,
+}: {
+  preparedOrder: PreparedConvexPerpOrder;
+  selectedWallet: Awaited<ReturnType<typeof useWallets>>["wallets"][number];
+}) {
+  if (isEmbeddedWallet(selectedWallet)) {
+    const account = await toViemAccount({ wallet: selectedWallet });
+    const signaturePayload = buildConvexTypedDataForSigning(preparedOrder);
+
+    return account.signTypedData(signaturePayload as Parameters<typeof account.signTypedData>[0]);
+  }
+
+  const provider = await selectedWallet.getEthereumProvider();
+  const providerPayload = buildConvexTypedDataForProvider(preparedOrder);
+  const connectorType = getWalletConnectorType(selectedWallet);
+  await ensureWalletChain(provider, preparedOrder.typedData.domain.chainId);
+
+  if (connectorType === "wallet_connect_v2") {
+    return (await provider.request({
+      method: "eth_signTypedData",
+      params: [selectedWallet.address, providerPayload],
+    })) as string;
+  }
+
+  try {
+    return (await provider.request({
+      method: "eth_signTypedData_v4",
+      params: [selectedWallet.address, providerPayload],
+    })) as string;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (!message.toLowerCase().includes("parse")) {
+      throw error;
+    }
+
+    return (await provider.request({
+      method: "eth_signTypedData_v4",
+      params: [selectedWallet.address, JSON.stringify(providerPayload)],
+    })) as string;
+  }
+}
+
+async function cancelManagedConvexOrder(order: ManagedConvexOrder) {
+  const response = await fetch("/api/markets/btcusdc-cvxperp/orders/cancel", {
+    body: JSON.stringify({
+      nonce: order.nonce,
+      ownerAddress: order.ownerAddress,
+    }),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  const payload = (await response.json()) as ConvexPerpOrderCancellation | { error?: string };
+
+  if (!response.ok) {
+    throw new Error(
+      "error" in payload
+        ? (payload.error ?? "BTCVAR30 cancel failed")
+        : "BTCVAR30 cancel failed",
+    );
+  }
+}
+
+async function getManagedConvexOrders(ownerAddress: string) {
+  const searchParams = new URLSearchParams({
+    ownerAddress,
+  });
+  const response = await fetch(`/api/markets/btcusdc-cvxperp/orders/open?${searchParams.toString()}`, {
+    cache: "no-store",
+  });
+  const payload = (await response.json()) as ManagedConvexOrder[] | { error?: string };
+
+  if (!response.ok) {
+    throw new Error(
+      "error" in payload
+        ? (payload.error ?? "BTCVAR30 open-orders load failed")
+        : "BTCVAR30 open-orders load failed",
+    );
+  }
+
+  return payload as ManagedConvexOrder[];
+}
+
+async function getBtcConvexAccount(ownerAddress: string) {
+  const searchParams = new URLSearchParams({
+    ownerAddress,
+  });
+  const response = await fetch(`/api/markets/btcusdc-cvxperp/account?${searchParams.toString()}`, {
+    cache: "no-store",
+  });
+  const payload = (await response.json()) as BtcConvexAccountSnapshot | { error?: string };
+
+  if (!response.ok) {
+    throw new Error(
+      "error" in payload
+        ? (payload.error ?? "BTCVAR30 account load failed")
+        : "BTCVAR30 account load failed",
+    );
+  }
+
+  return payload as BtcConvexAccountSnapshot;
+}
+
+async function getBtcConvexRiskPreview({
+  ownerAddress,
+  side,
+  sizeBtc,
+}: {
+  ownerAddress: string;
+  side: "buy" | "sell";
+  sizeBtc: string;
+}) {
+  const searchParams = new URLSearchParams({
+    ownerAddress,
+    side,
+    sizeBtc,
+  });
+  const response = await fetch(`/api/markets/btcusdc-cvxperp/risk?${searchParams.toString()}`, {
+    cache: "no-store",
+  });
+  const payload = (await response.json()) as BtcConvexRiskSnapshot | { error?: string };
+
+  if (!response.ok) {
+    throw new Error(
+      "error" in payload
+        ? (payload.error ?? "BTCVAR30 risk preview failed")
+        : "BTCVAR30 risk preview failed",
+    );
+  }
+
+  return payload as BtcConvexRiskSnapshot;
+}
 
 export function TradingTerminal({
   initialBtcOrderBook,
   initialBtcSnapshot,
-  initialNgnSnapshot,
 }: {
   initialBtcOrderBook: MatchingBackendOrderBookSnapshot | null;
-  initialBtcSnapshot: BtcSquaredPerpSnapshot | null;
-  initialNgnSnapshot: NgnPerpSnapshot | null;
+  initialBtcSnapshot: BtcConvexPerpSnapshot | null;
 }) {
   const { authenticated, ready: privyReady } = usePrivy();
   const { ready: walletsReady, wallets } = useWallets();
-  const [selectedMarketId, setSelectedMarketId] = useState("btc-usd-futures");
+  const [selectedMarketId, setSelectedMarketId] = useState("btc-var-30-perp");
   const [selectedSymbol, setSelectedSymbol] =
     useState<keyof typeof INSTRUMENT_MARKETS>(DEFAULT_SYMBOL);
   const [selectedContract, setSelectedContract] = useState<SelectedContract>(DEFAULT_CONTRACT);
@@ -484,9 +994,16 @@ export function TradingTerminal({
   const [selectedBottomTab, setSelectedBottomTab] =
     useState<keyof typeof ACTIVITY_VIEWS>(DEFAULT_BOTTOM_TAB);
   const [filter, setFilter] = useState<(typeof FILTER_OPTIONS)[number]>(DEFAULT_FILTER);
-  const [btcOrderBook, setBtcOrderBook] = useState<MatchingBackendOrderBookSnapshot | null>(initialBtcOrderBook);
-  const [btcSnapshot, setBtcSnapshot] = useState<BtcSquaredPerpSnapshot | null>(initialBtcSnapshot);
-  const [ngnSnapshot, setNgnSnapshot] = useState<NgnPerpSnapshot | null>(initialNgnSnapshot);
+  const { btcOrderBook, btcSnapshot } = useBtcConvexMarketData({
+    initialBtcOrderBook,
+    initialBtcSnapshot,
+    selectedSymbol,
+  });
+  const [btcAccountSnapshot, setBtcAccountSnapshot] = useState<BtcConvexAccountSnapshot | null>(null);
+  const [btcRiskSnapshot, setBtcRiskSnapshot] = useState<BtcConvexRiskSnapshot | null>(null);
+  const [managedOrders, setManagedOrders] = useState<ManagedConvexOrder[]>([]);
+  const [submissionFeedback, setSubmissionFeedback] = useState<string | null>(null);
+  const [submissionPending, setSubmissionPending] = useState(false);
 
   const market = INSTRUMENT_MARKETS[selectedSymbol][selectedContract];
   const {
@@ -494,7 +1011,7 @@ export function TradingTerminal({
     displayOrderBook,
     dynamicMarketOptions,
     dynamicPositionOverview,
-    isBtcSquaredMarket,
+    isBtcConvexMarket,
     liveIndex,
     liveMark,
     orderPreviewMetrics,
@@ -503,7 +1020,6 @@ export function TradingTerminal({
     btcOrderBook,
     btcSnapshot,
     market,
-    ngnSnapshot,
     selectedMarketId,
     selectedSymbol,
     size,
@@ -511,86 +1027,164 @@ export function TradingTerminal({
     tradeSide,
   });
   const displayTicker = selectedMarket.symbol;
-  const liveBasis = liveMark - liveIndex;
-  const lastAction = buildTradeStatus(tradeSide, displayTicker, orderPreviewMetrics);
-  const dynamicActivityViews = buildActivityViews(
-    displayTicker,
-    orderPreviewMetrics,
-    currentPositionMetrics,
-  );
+  const lastAction =
+    submissionFeedback ?? buildTradeStatus(tradeSide, displayTicker, orderPreviewMetrics);
   const displayCandles = getDisplayCandles(
     chartContext,
     liveMark,
-    liveBasis,
     market.candles,
     liveIndex,
   );
 
   const liveInfoBar = buildLiveInfoBar(
     market.infoBar,
-    selectedMarket.marketType,
-    selectedSymbol,
-    liveBasis,
     liveIndex,
+    liveMark,
   );
   const [liveCandles, setLiveCandles] = useState<Candle[]>(displayCandles);
   const displayOrderBookAsks = displayOrderBook.asks;
   const displayOrderBookBids = displayOrderBook.bids;
   const walletConnected = privyReady && walletsReady && authenticated && wallets.length > 0;
-  const tradeSubmissionEnabled = false;
-  let tradeSubmissionNotice = "Order entry is still using static terminal data for this market.";
+  const selectedWallet = wallets[0] ?? null;
+  const parsedSize = Number(size || "0");
+  const { submitLabel, tradeSubmissionEnabled, tradeSubmissionNotice } =
+    getTradeSubmissionState({
+      riskSnapshot: btcRiskSnapshot,
+      isBtcConvexMarket,
+      orderType,
+      parsedSize,
+      submissionPending,
+      tradeSide,
+      walletConnected,
+    });
 
-  if (isBtcSquaredMarket) {
-    tradeSubmissionNotice = walletConnected
-      ? "Wallet connected. Live convex perpetual depth is coming from matching-backend, but order entry stays read only until Archer wires signed backend actions."
-      : "Connect a wallet to prepare for signing. Live convex perpetual depth is coming from matching-backend, but order entry stays read only until Archer wires signed backend actions.";
-  }
+  const cancelBtcConvexOrder = useEffectEvent(async function cancelBtcConvexOrder(
+    order: ManagedConvexOrder,
+  ) {
+    setSubmissionPending(true);
+    setSubmissionFeedback(`Cancelling ${order.orderId.slice(0, 14)}...`);
 
-  const refreshBtcSquaredMarket = useEffectEvent(async function refreshBtcSquaredMarket() {
     try {
-      const response = await fetch("/api/markets/btcusdc-sqperp", {
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        return;
-      }
-
-      setBtcSnapshot((await response.json()) as BtcSquaredPerpSnapshot);
-    } catch {
-      // Keep the last good snapshot and let the rest of the UI continue rendering.
+      await cancelManagedConvexOrder(order);
+      setManagedOrders((current) => current.filter((candidate) => candidate.orderId !== order.orderId));
+      setSubmissionFeedback(`Cancelled volatility order ${order.orderId.slice(0, 14)}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "BTCVAR30 cancel failed";
+      setSubmissionFeedback(message);
+    } finally {
+      setSubmissionPending(false);
     }
   });
 
-  const refreshBtcSquaredOrderBook = useEffectEvent(async function refreshBtcSquaredOrderBook() {
+  const amendBtcConvexOrder = useEffectEvent(async function amendBtcConvexOrder(
+    order: ManagedConvexOrder,
+  ) {
+    if (!selectedWallet) {
+      return;
+    }
+
+    setSubmissionPending(true);
+    setSubmissionFeedback(`Replacing ${order.orderId.slice(0, 14)} with current order settings...`);
+
     try {
-      const response = await fetch("/api/markets/btcusdc-sqperp/book", {
-        cache: "no-store",
+      await cancelManagedConvexOrder(order);
+      const replacementOrder = await submitSignedConvexOrder({
+        deltaEquivalentBtc: orderPreviewMetrics.deltaEquivalentBtc,
+        markVariance: liveMark,
+        selectedWallet,
+        tradeSide,
       });
-
-      if (!response.ok) {
-        return;
-      }
-
-      setBtcOrderBook((await response.json()) as MatchingBackendOrderBookSnapshot);
-    } catch {
-      // Keep the last good snapshot and let the rest of the UI continue rendering.
+      setManagedOrders((current) => [replacementOrder, ...current.filter((candidate) => candidate.orderId !== order.orderId)]);
+      setSubmissionFeedback(
+        `Replaced ${order.orderId.slice(0, 14)} with ${replacementOrder.orderId.slice(0, 14)}.`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "BTCVAR30 amend failed";
+      setSubmissionFeedback(message);
+    } finally {
+      setSubmissionPending(false);
     }
   });
 
-  const refreshNgnMarket = useEffectEvent(async function refreshNgnMarket() {
+  const dynamicActivityViews = buildActivityViews(
+    displayTicker,
+    managedOrders,
+    currentPositionMetrics,
+    (order) => void amendBtcConvexOrder(order),
+    (order) => void cancelBtcConvexOrder(order),
+  );
+
+  const submitBtcConvexOrder = useEffectEvent(async function submitBtcConvexOrder() {
+    if (!tradeSubmissionEnabled || !selectedWallet) {
+      return;
+    }
+
+    setSubmissionPending(true);
+    setSubmissionFeedback("Awaiting wallet signature...");
+
     try {
-      const response = await fetch("/api/markets/ngnusdc", {
-        cache: "no-store",
+      const submittedOrder = await submitSignedConvexOrder({
+        deltaEquivalentBtc: orderPreviewMetrics.deltaEquivalentBtc,
+        markVariance: liveMark,
+        selectedWallet,
+        tradeSide,
       });
+      setManagedOrders((current) => [submittedOrder, ...current]);
 
-      if (!response.ok) {
-        return;
-      }
+      setSubmissionFeedback(
+        `Submitted ${tradeSide === "buy" ? "long" : "short"} volatility order ${submittedOrder.orderId.slice(0, 14)} to the matching backend.`,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "BTCVAR30 order submission failed";
+      setSubmissionFeedback(message);
+    } finally {
+      setSubmissionPending(false);
+    }
+  });
 
-      setNgnSnapshot((await response.json()) as NgnPerpSnapshot);
+  const refreshManagedOrders = useEffectEvent(async function refreshManagedOrders() {
+    if (!selectedWallet || !isBtcConvexMarket) {
+      setManagedOrders([]);
+      return;
+    }
+
+    try {
+      setManagedOrders(await getManagedConvexOrders(selectedWallet.address));
     } catch {
-      // Keep the last good snapshot and let the rest of the UI continue rendering.
+      // Keep the current order list if backend reads fail temporarily.
+    }
+  });
+
+  const refreshBtcAccount = useEffectEvent(async function refreshBtcAccount() {
+    if (!selectedWallet || !isBtcConvexMarket) {
+      setBtcAccountSnapshot(null);
+      return;
+    }
+
+    try {
+      setBtcAccountSnapshot(await getBtcConvexAccount(selectedWallet.address));
+    } catch {
+      // Keep the current account snapshot if the backend read fails temporarily.
+    }
+  });
+
+  const refreshBtcRisk = useEffectEvent(async function refreshBtcRisk() {
+    if (!selectedWallet || !isBtcConvexMarket || !Number.isFinite(parsedSize) || parsedSize <= 0) {
+      setBtcRiskSnapshot(null);
+      return;
+    }
+
+    try {
+      setBtcRiskSnapshot(
+        await getBtcConvexRiskPreview({
+          ownerAddress: selectedWallet.address,
+          side: tradeSide,
+          sizeBtc: Math.abs(orderPreviewMetrics.deltaEquivalentBtc).toFixed(8),
+        }),
+      );
+    } catch {
+      setBtcRiskSnapshot(null);
     }
   });
 
@@ -599,7 +1193,6 @@ export function TradingTerminal({
       getDisplayCandles(
         chartContext,
         liveMark,
-        liveBasis,
         market.candles,
         liveIndex,
       ),
@@ -607,7 +1200,6 @@ export function TradingTerminal({
   }, [
     chartContext,
     liveMark,
-    liveBasis,
     liveIndex,
     market.candles,
     selectedContract,
@@ -618,27 +1210,11 @@ export function TradingTerminal({
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      setLiveCandles((currentCandles) => simulateLiveCandles(currentCandles, selectedSymbol, timeframe));
+      setLiveCandles((currentCandles) => simulateLiveCandles(currentCandles, chartContext, timeframe));
     }, getChartUpdateInterval(timeframe));
 
     return () => window.clearInterval(intervalId);
-  }, [selectedSymbol, selectedMarketId, timeframe, chartContext]);
-
-  useEffect(() => {
-    if (selectedSymbol !== "BTC/USD") {
-      return;
-    }
-
-    void refreshBtcSquaredMarket();
-    void refreshBtcSquaredOrderBook();
-
-    const intervalId = window.setInterval(() => {
-      void refreshBtcSquaredMarket();
-      void refreshBtcSquaredOrderBook();
-    }, BTC_MARKET_POLL_INTERVAL_MS);
-
-    return () => window.clearInterval(intervalId);
-  }, [selectedSymbol]);
+  }, [selectedMarketId, timeframe, chartContext]);
 
   useEffect(() => {
     setOrderBookDisplayMode(market.presentation?.displayMode ?? "price");
@@ -647,18 +1223,16 @@ export function TradingTerminal({
   }, [market.presentation, selectedContract, selectedMarketId, selectedSymbol]);
 
   useEffect(() => {
-    if (selectedSymbol !== "NGN/USD") {
-      return;
-    }
+    void refreshManagedOrders();
+  }, [selectedWallet?.address, isBtcConvexMarket]);
 
-    void refreshNgnMarket();
+  useEffect(() => {
+    void refreshBtcAccount();
+  }, [selectedWallet?.address, isBtcConvexMarket]);
 
-    const intervalId = window.setInterval(() => {
-      void refreshNgnMarket();
-    }, NGN_MARKET_POLL_INTERVAL_MS);
-
-    return () => window.clearInterval(intervalId);
-  }, [selectedSymbol]);
+  useEffect(() => {
+    void refreshBtcRisk();
+  }, [selectedWallet?.address, isBtcConvexMarket, parsedSize, liveMark, liveIndex, sizingMode, tradeSide]);
 
   function handleContractSelect(contract: string) {
     startTransition(() => {
@@ -688,13 +1262,15 @@ export function TradingTerminal({
 
   return (
     <main className="min-h-screen bg-[#0B1118] text-[#D1D5DB] xl:h-screen xl:overflow-hidden">
-      <LiveTabTitle pair={selectedSymbol} price={liveCandles.at(-1)?.close ?? null} />
+      <LiveTabTitle pair={displayTicker} price={liveMark} />
 
       <div className="mx-auto flex min-h-screen w-full max-w-none flex-col p-2 xl:h-screen xl:overflow-hidden">
         <MarketHeader
           contractTabs={CONTRACT_TABS}
           currentContract={selectedContract}
+          currentDisplayName={selectedMarket.displayName ?? market.presentation?.semantics?.displayName ?? displayTicker}
           currentMarketId={selectedMarketId}
+          currentSemantics={selectedMarket.semantics ?? market.presentation?.semantics}
           currentSymbol={displayTicker}
           infoBar={liveInfoBar}
           marketOptions={dynamicMarketOptions}
@@ -711,6 +1287,7 @@ export function TradingTerminal({
               expandedChart={expandedChart}
               indicatorsEnabled={indicatorsEnabled}
               riskModel={displayOrderBook.riskModel}
+              semantics={market.presentation?.semantics}
               selectedRange={selectedRange}
               selectedTimeframe={timeframe}
               selectedTool={selectedTool}
@@ -736,6 +1313,7 @@ export function TradingTerminal({
                   : undefined
               }
               riskModel={displayOrderBook.riskModel}
+              semantics={market.presentation?.semantics}
               trades={market.trades}
               view={orderBookView}
               onDisplayModeChange={setOrderBookDisplayMode}
@@ -745,6 +1323,7 @@ export function TradingTerminal({
 
           <div className="min-h-[420px] xl:min-h-0 xl:overflow-hidden">
             <TradePanel
+              accountSnapshot={btcAccountSnapshot}
               baseAsset={getBaseAsset(selectedSymbol)}
               allocation={allocation}
               contractDetails={market.contractDetails}
@@ -752,15 +1331,19 @@ export function TradingTerminal({
               executionMode={tradeSubmissionEnabled ? "ready" : "disabled"}
               exposureMetrics={orderPreviewMetrics}
               lastAction={lastAction}
+              onSubmit={() => void submitBtcConvexOrder()}
               orderType={orderType}
               positionOverview={dynamicPositionOverview}
               postOnly={postOnly}
               quoteAsset="USDC"
+              riskSnapshot={btcRiskSnapshot}
               settlementWallet="USDC Margin"
               size={size}
               sizingMode={sizingMode}
               submissionEnabled={tradeSubmissionEnabled}
+              submissionPending={submissionPending}
               submissionNotice={tradeSubmissionNotice}
+              submitLabel={submitLabel}
               supportedSizingModes={market.presentation?.sizingModes ?? ["notional"]}
               tradeSide={tradeSide}
               onAllocationChange={setAllocation}

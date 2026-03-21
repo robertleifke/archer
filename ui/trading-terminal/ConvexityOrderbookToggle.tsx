@@ -3,14 +3,14 @@ import { cn } from "@/lib/cn";
 
 function getDisplayLabel(mode: OrderBookDisplayMode) {
   if (mode === "delta") {
-    return "Delta Eq";
+    return "Spot Sens";
   }
 
   if (mode === "convex") {
-    return "Convexity";
+    return "Gamma";
   }
 
-  return "Price";
+  return "Vol";
 }
 
 export function ConvexityOrderbookToggle({

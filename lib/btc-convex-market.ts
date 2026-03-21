@@ -1,24 +1,18 @@
 import "server-only";
 
+import { toBtcVar30Snapshot } from "@/lib/btcvar30-display";
+import type { BtcConvexPerpSnapshot } from "@/lib/trading.types";
+
 const DEFAULT_BASE_MAINNET_RPC_URL = "https://mainnet.base.org";
-const BTC_SQUARED_PERP_ADDRESS = "0x0d5e36041064248445F8a8D5d0bBDc3b5c48fDA7";
+const BTC_CONVEX_PERP_ADDRESS = "0x0d5e36041064248445F8a8D5d0bBDc3b5c48fDA7";
 const GET_INDEX_PRICE_SELECTOR = "0x58c0994a";
 const GET_PERP_PRICE_SELECTOR = "0x90f76b18";
 const E18 = 1_000_000_000_000_000_000n;
 const EXPECTED_PERP_REVERT_PATTERNS = ["execution reverted", "getPerpPrice() failed"];
+const FALLBACK_INDEX_VARIANCE = 0.2609;
+const FALLBACK_MARK_VARIANCE = 0.2728;
 let hasLoggedExpectedPerpFallback = false;
-
-export type BtcSquaredPerpSnapshot = {
-  confidence: number;
-  contractAddress: string;
-  displayIndexBtcUsd: number;
-  displayMarkBtcUsd: number;
-  fallbackUsed: boolean;
-  indexSquaredUsd: number;
-  markSquaredUsd: number;
-  markSource: "index_fallback" | "perp";
-  pair: "BTCUSDC-CVXPERP";
-};
+let hasLoggedLegacySourceFallback = false;
 
 function getBaseMainnetRpcUrl() {
   return process.env.BASE_RPC_URL?.trim() || DEFAULT_BASE_MAINNET_RPC_URL;
@@ -34,7 +28,7 @@ async function callBaseRpc(data: string, label: string) {
       params: [
         {
           data,
-          to: BTC_SQUARED_PERP_ADDRESS,
+          to: BTC_CONVEX_PERP_ADDRESS,
         },
         "latest",
       ],
@@ -102,14 +96,30 @@ function logExpectedPerpFallbackOnce(error: unknown) {
   });
 }
 
-export async function getBtcSquaredPerpSnapshot(): Promise<BtcSquaredPerpSnapshot> {
+function looksLikeLegacySquaredPrice(value: number) {
+  return Number.isFinite(value) && value > 1000;
+}
+
+function logLegacySourceFallbackOnce(indexValue: number, markValue: number) {
+  if (hasLoggedLegacySourceFallback) {
+    return;
+  }
+
+  hasLoggedLegacySourceFallback = true;
+  console.info("BTCVAR30 snapshot source returned legacy squared-price units; using normalized variance fallback.", {
+    indexValue,
+    markValue,
+  });
+}
+
+export async function getBtcConvexPerpSnapshot(): Promise<BtcConvexPerpSnapshot> {
   const [indexResult, perpResult] = await Promise.allSettled([
     callBaseRpc(GET_INDEX_PRICE_SELECTOR, "getIndexPrice()"),
     callBaseRpc(GET_PERP_PRICE_SELECTOR, "getPerpPrice()"),
   ]);
 
   if (indexResult.status === "rejected") {
-    console.warn("BTC squared index price read failed:", indexResult.reason);
+    console.warn("BTC convex perp index price read failed:", indexResult.reason);
   }
 
   if (perpResult.status === "rejected") {
@@ -121,7 +131,7 @@ export async function getBtcSquaredPerpSnapshot(): Promise<BtcSquaredPerpSnapsho
   }
 
   if (indexResult.status === "rejected" && perpResult.status === "rejected") {
-    throw new Error("BTC squared market reads failed");
+    throw new Error("BTC convex perp market reads failed");
   }
 
   const indexHex = indexResult.status === "fulfilled" ? indexResult.value : null;
@@ -131,23 +141,29 @@ export async function getBtcSquaredPerpSnapshot(): Promise<BtcSquaredPerpSnapsho
   const resolvedMarkHex = perpHex ?? indexHex;
 
   if (!resolvedIndexHex || !resolvedMarkHex) {
-    throw new Error("BTC squared market returned no usable price data");
+    throw new Error("BTC convex perp market returned no usable price data");
   }
 
-  const indexSquaredUsd = scale18ToNumber(decodeUint256(readWord(resolvedIndexHex, 0)));
-  const markSquaredUsd = scale18ToNumber(decodeUint256(readWord(resolvedMarkHex, 0)));
+  const indexVariance = scale18ToNumber(decodeUint256(readWord(resolvedIndexHex, 0)));
+  const markVariance = scale18ToNumber(decodeUint256(readWord(resolvedMarkHex, 0)));
   const confidence =
     fallbackUsed ? 0 : Number(decodeUint256(readWord(resolvedMarkHex, 1))) / 1e18;
+  const usesLegacySquaredPriceUnits =
+    looksLikeLegacySquaredPrice(indexVariance) || looksLikeLegacySquaredPrice(markVariance);
 
-  return {
+  if (usesLegacySquaredPriceUnits) {
+    logLegacySourceFallbackOnce(indexVariance, markVariance);
+  }
+
+  return toBtcVar30Snapshot({
     confidence,
-    contractAddress: BTC_SQUARED_PERP_ADDRESS,
-    displayIndexBtcUsd: Math.sqrt(indexSquaredUsd),
-    displayMarkBtcUsd: Math.sqrt(markSquaredUsd),
+    contractAddress: BTC_CONVEX_PERP_ADDRESS,
     fallbackUsed,
-    indexSquaredUsd,
-    markSquaredUsd,
+    indexValue: usesLegacySquaredPriceUnits ? FALLBACK_INDEX_VARIANCE : indexVariance,
+    indexValueSource: "variance",
     markSource: fallbackUsed ? "index_fallback" : "perp",
-    pair: "BTCUSDC-CVXPERP",
-  };
+    markValue: usesLegacySquaredPriceUnits ? FALLBACK_MARK_VARIANCE : markVariance,
+    markValueSource: "variance",
+    pair: "BTCVAR30-PERP",
+  });
 }
